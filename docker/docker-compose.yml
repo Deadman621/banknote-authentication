@@ -1,0 +1,32 @@
+services:
+  banknote-ai:
+    container_name: banknote-ai
+
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+
+    image: banknote-ai:latest
+
+    working_dir: /workspace
+
+    volumes:
+      - ..:/workspace:cached
+
+    ports:
+      - "8501:8501" # Streamlit
+      - "8888:8888" # JupyterLab
+      - "6006:6006" # TensorBoard
+
+    stdin_open: true
+    tty: true
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    gpus: all
+
+    shm_size: "8gb"
+
+    command: bash

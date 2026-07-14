@@ -3,6 +3,42 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# Dataset
+data/raw/
+data/processed/
+data/external/
+
+checkpoints/*
+
+experiments/*
+
+logs/*
+
+reports/*
+
+# Training artifacts
+runs/
+wandb/
+mlruns/
+lightning_logs/
+
+# Grad-CAM & evaluation outputs
+gradcam_outputs/
+predictions/
+inference/
+outputs/
+results/
+
+# Keep directory structure
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/external/.gitkeep
+
+!checkpoints/.gitkeep
+!experiments/.gitkeep
+!logs/.gitkeep
+!reports/.gitkeep
+
 # C extensions
 *.so
 
