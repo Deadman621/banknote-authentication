@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM pytorch/pytorch:2.13.0-cuda13.2-cudnn9-devel
+FROM pytorch/pytorch:2.13.0-cuda13.2-cudnn9-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
