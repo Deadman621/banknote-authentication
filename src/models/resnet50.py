@@ -20,4 +20,3 @@ class ResNet50(nn.Module):
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         return self.model(images)
-

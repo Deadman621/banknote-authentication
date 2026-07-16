@@ -1,47 +1,114 @@
-from math import floor
-from torch.utils.data import DataLoader, random_split
+"""
+Generic DataLoader factories for currency-recognition datasets.
+"""
 
-from src.datasets.dataset import CurrencyDataset
+from math import isclose
+
+import torch
+from torch import Tensor
+from torch.utils.data import DataLoader, Dataset, random_split
 
 
-def create_dataloaders(
+DatasetType = Dataset[tuple[Tensor, int]]
+LoaderType = DataLoader[tuple[Tensor, Tensor]]
+
+
+def create_dataloader(
+    dataset: DatasetType,
     batch_size: int = 32,
-    image_size: int = 224,
-    num_classes: int = 2,
-    dataset_size: int = 640,
+    shuffle: bool = False,
+    num_workers: int = 0,
+    pin_memory: bool | None = None,
+    drop_last: bool = False,
+) -> LoaderType:
+    """
+    Create a configured PyTorch DataLoader.
+    """
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than 0.")
+
+    if num_workers < 0:
+        raise ValueError("num_workers cannot be negative.")
+
+    if pin_memory is None:
+        pin_memory = torch.cuda.is_available()
+
+    return DataLoader(
+        dataset=dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        drop_last=drop_last,
+        persistent_workers=num_workers > 0,
+    )
+
+
+def create_train_val_dataloaders(
+    dataset: DatasetType,
+    batch_size: int = 32,
     train_split: float = 0.8,
     val_split: float = 0.2,
     num_workers: int = 0,
-):
-    if train_split + val_split != 1.0:
-        raise ValueError("train_split + val_split must equal 1.0")
+    seed: int = 42,
+) -> tuple[LoaderType, LoaderType]:
+    """
+    Split one dataset reproducibly and create train/validation loaders.
+    """
 
-    dataset = CurrencyDataset(
-        image_size=image_size,
-        num_classes=num_classes,
-        length=dataset_size,
-    )
+    if not isclose(
+        train_split + val_split,
+        1.0,
+        rel_tol=1e-9,
+        abs_tol=1e-9,
+    ):
+        raise ValueError(
+            "train_split + val_split must equal 1.0."
+        )
 
-    train_length = floor(dataset_size * train_split)
+    if train_split <= 0 or val_split <= 0:
+        raise ValueError(
+            "train_split and val_split must both be greater than 0."
+        )
+
+    dataset_size = len(dataset)
+
+    if dataset_size < 2:
+        raise ValueError(
+            "At least two samples are required for a train/validation split."
+        )
+
+    train_length = int(dataset_size * train_split)
     val_length = dataset_size - train_length
+
+    if train_length == 0 or val_length == 0:
+        raise ValueError(
+            "The requested split produced an empty dataset."
+        )
+
+    generator = torch.Generator().manual_seed(seed)
 
     train_dataset, val_dataset = random_split(
         dataset,
         [train_length, val_length],
+        generator=generator,
     )
 
-    train_loader = DataLoader(
-        train_dataset,
+    train_loader = create_dataloader(
+        dataset=train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
+        drop_last=False,
     )
 
-    val_loader = DataLoader(
-        val_dataset,
+    val_loader = create_dataloader(
+        dataset=val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
+        drop_last=False,
     )
 
     return train_loader, val_loader
