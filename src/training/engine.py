@@ -14,6 +14,7 @@ from src.training.callbacks.base import Callback
 from src.training.metrics import accuracy
 from src.training.state import TrainState
 from src.training.protocols import SchedulerProtocol
+from src.training.utils import move_batch_to_device
 
 from torch.utils.data import DataLoader
 
@@ -62,8 +63,7 @@ class TrainingEngine:
 
         self.model.train()
 
-        images = images.to(self.device)
-        labels = labels.to(self.device)
+        images, labels = move_batch_to_device(images, labels, self.device)
         self.amp.zero_grad(self.optimizer)
 
         with self.amp.autocast():
@@ -122,10 +122,7 @@ class TrainingEngine:
         with torch.no_grad():
 
             for images, labels in loader:
-
-                images = images.to(self.device)
-                labels = labels.to(self.device)
-
+                images, labels = move_batch_to_device(images, labels, self.device)
                 with self.amp.autocast():
                     logits = self.model(images)
                     loss = self.loss_fn(logits, labels,)

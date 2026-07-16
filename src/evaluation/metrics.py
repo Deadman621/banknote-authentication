@@ -120,5 +120,5 @@ def roc_auc(probabilities: Tensor, targets: Tensor) -> float:
     if probabilities.shape[1] == 2:
         return float(roc_auc_score(y_true, y_score[:, 1]))
 
-    return float(roc_auc_score(y_true, y_score, multi_class="ovr", average="macro"))\
+    return float(roc_auc_score(y_true, y_score, multi_class="ovr", average="macro"))
         
