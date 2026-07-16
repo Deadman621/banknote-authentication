@@ -9,19 +9,7 @@ import torch
 from torch import nn
 from torch.optim import Optimizer
 
-
-class SchedulerProtocol(Protocol):
-    """
-    Minimal scheduler interface required for checkpoints.
-    """
-
-    def state_dict(self) -> dict[str, object]:
-        ...
-
-
-    def load_state_dict(self, state_dict: dict[str, object]) -> None:
-        ...
-
+from src.training.protocols import SchedulerProtocol
 
 def save_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer, epoch: int, global_step: int, scheduler: SchedulerProtocol | None = None) -> None:
     """
