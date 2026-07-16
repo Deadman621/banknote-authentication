@@ -1,0 +1,5 @@
+model:
+  name: vit
+  pretrained: true
+  image_size: 224
+  patch_size: 16
