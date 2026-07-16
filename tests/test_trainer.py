@@ -1,40 +1,121 @@
+from __future__ import annotations
+
 import torch
-from torch import nn
+import torch.nn as nn
 
-from src.datasets.dataloader import create_dataloaders
-from src.models.cnn import CNN
-from src.core.trainer import Trainer
+from torch.utils.data import DataLoader, TensorDataset
+
+from src.core.config import (
+    ExperimentConfig,
+)
+from src.core.config import (
+    CheckpointConfig,
+    EarlyStoppingConfig,
+    ExperimentSettings,
+    DatasetConfig,
+    TrainerConfig,
+    OptimizerConfig,
+    SchedulerConfig,
+    LossConfig,
+    ModelConfig,
+    LoggingConfig,
+    OutputConfig,
+)
+
+from src.training.trainer import Trainer
 
 
-def main() -> None:
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else "cpu"
+def create_config() -> ExperimentConfig:
+    return ExperimentConfig(
+        seed=1,
+        device="cpu",
+        experiment=ExperimentSettings(
+            name="test",
+        ),
+        dataset=DatasetConfig(
+            root=None,  # replace if Path required
+            image_size=224,
+            batch_size=4,
+            num_workers=0,
+            pin_memory=False,
+            persistent_workers=False,
+            num_classes=3,
+            class_names=(
+                "a",
+                "b",
+                "c",
+            ),
+        ),
+        trainer=TrainerConfig(
+            epochs=1,
+            mixed_precision=False,
+            gradient_clip=None,
+            early_stopping=EarlyStoppingConfig(
+                patience=5,
+                monitor="validation_loss",
+            ),
+            checkpoint=CheckpointConfig(
+                monitor="validation_loss",
+                mode="min",
+                save_best_only=True,
+            ),
+        ),
+        optimizer=OptimizerConfig(
+            name="adam",
+            lr=0.001,
+            weight_decay=0.0,
+        ),
+        scheduler=SchedulerConfig(
+            name="none",
+        ),
+        loss=LossConfig(
+            name="cross_entropy",
+        ),
+        model=ModelConfig(
+            name="test",
+            pretrained=False,
+        ),
+        logging=LoggingConfig(
+            level="INFO",
+        ),
+        output=OutputConfig(
+            save_dir=".",
+        ),
     )
 
-    train_loader, val_loader = create_dataloaders()
 
-    model = CNN(num_classes=2)
+def test_trainer_fit() -> None:
 
-    criterion = nn.CrossEntropyLoss()
+    model = nn.Linear(
+        10,
+        3,
+    )
 
     optimizer = torch.optim.Adam(
         model.parameters(),
-        lr=1e-3,
     )
 
     trainer = Trainer(
+        config=create_config(),
         model=model,
-        criterion=criterion,
+        loss_fn=nn.CrossEntropyLoss(),
         optimizer=optimizer,
-        device=device,
+        device=torch.device("cpu"),
     )
 
-    trainer.fit(
-        train_loader=train_loader,
-        val_loader=val_loader,
-        epochs=3,
+    dataset = TensorDataset(
+        torch.randn(8,10),
+        torch.randint(0,3,(8,)),
     )
 
+    loader = DataLoader(
+        dataset,
+        batch_size=4,
+    )
 
-if __name__ == "__main__":
-    main()
+    state = trainer.fit(
+        loader,
+        loader,
+    )
+
+    assert state.epoch == 1
