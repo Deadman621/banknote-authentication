@@ -48,10 +48,10 @@ class ExperimentPaths:
     predictions: Path
     figures: Path
     gradcam: Path
+    evaluation: Path
 
     config_file: Path
     log_file: Path
-    metrics_file: Path
 
 def deep_merge(base: ConfigDict, update: Mapping[str, ConfigValue]) -> ConfigDict:
     """
@@ -300,6 +300,7 @@ def create_experiment_paths(save_dir: Path, module: str, model: str, experiment_
         / timestamp
     )
 
+    evaluation = root / "evaluation"
     checkpoints = root / "checkpoints"
     predictions = root / "predictions"
     figures = root / "figures"
@@ -310,6 +311,7 @@ def create_experiment_paths(save_dir: Path, module: str, model: str, experiment_
         predictions,
         figures,
         gradcam,
+        evaluation,
     ):
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -319,9 +321,9 @@ def create_experiment_paths(save_dir: Path, module: str, model: str, experiment_
         predictions=predictions,
         figures=figures,
         gradcam=gradcam,
+        evaluation=evaluation,
         config_file=root / "config.yaml",
         log_file=root / "train.log",
-        metrics_file=root / "metrics.json",
     )
 
 class Experiment:
