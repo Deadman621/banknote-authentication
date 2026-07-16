@@ -36,17 +36,13 @@ class CheckpointConfig:
     mode: str
     save_best_only: bool
 
-
 @dataclass(frozen=True, slots=True)
 class TrainerConfig:
     epochs: int
-    batch_size: int
     mixed_precision: bool
-    gradient_clip: float |None
-
+    gradient_clip: float | None
     early_stopping: EarlyStoppingConfig
     checkpoint: CheckpointConfig
-
 
 @dataclass(frozen=True, slots=True)
 class OptimizerConfig:

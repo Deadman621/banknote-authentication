@@ -9,6 +9,7 @@ dataset:
   image_size: 224
   num_workers: 4
   pin_memory: true
+  batch_size: 32
   persistent_workers: true
 
 logging:
