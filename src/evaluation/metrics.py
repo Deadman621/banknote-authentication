@@ -15,6 +15,18 @@ from sklearn.metrics import (
 )
 
 from torch import Tensor
+from src.evaluation.state import EvaluationMetrics
+
+def classification_metrics(predictions: Tensor, targets: Tensor, probabilities: Tensor) -> EvaluationMetrics:
+    """Compute all classification metrics."""
+
+    return EvaluationMetrics(
+        accuracy=accuracy(predictions, targets),
+        precision=precision(predictions, targets),
+        recall=recall(predictions, targets),
+        f1=f1(predictions, targets),
+        roc_auc=roc_auc(probabilities, targets),
+    )
 
 
 def accuracy(predictions: Tensor, targets: Tensor) -> float:
@@ -108,4 +120,5 @@ def roc_auc(probabilities: Tensor, targets: Tensor) -> float:
     if probabilities.shape[1] == 2:
         return float(roc_auc_score(y_true, y_score[:, 1]))
 
-    return float(roc_auc_score(y_true, y_score, multi_class="ovr", average="macro"))
+    return float(roc_auc_score(y_true, y_score, multi_class="ovr", average="macro"))\
+        
