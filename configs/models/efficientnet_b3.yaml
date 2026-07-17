@@ -1,3 +1,0 @@
-model:
-	name: efficientnet_b3
-	pretrained: true

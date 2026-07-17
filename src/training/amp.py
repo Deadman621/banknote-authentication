@@ -35,7 +35,7 @@ class AMPContext:
         if not self.enabled:
             return nullcontext()
 
-        return torch.cuda.amp.autocast()
+        return torch.amp.autocast("cuda")
 
     def backward(self, loss: Tensor, optimizer: Optimizer) -> None:
         """
