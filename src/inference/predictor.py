@@ -19,10 +19,7 @@ class Predictor:
         with torch.inference_mode():
             logits = self._model(image)
 
-            probabilities = torch.softmax(
-                logits,
-                dim=1,
-            ).squeeze(0)
+            probabilities = torch.softmax(logits, dim=1).squeeze(0)
 
         predicted_class = int(torch.argmax(probabilities).item())
         confidence = float(probabilities[predicted_class].item())
@@ -38,10 +35,7 @@ class Predictor:
 
         with torch.inference_mode():
             logits = self._model(images)
-            probabilities = torch.softmax(
-                logits,
-                dim=1,
-            )
+            probabilities = torch.softmax(logits, dim=1)
 
         predictions: list[PredictionResult] = []
 
