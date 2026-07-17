@@ -14,7 +14,7 @@ from src.training.state import TrainState
 from src.training.amp import AMPContext
 from src.training.callbacks.base import Callback
 from src.training.engine import TrainingEngine
-from src.training.protocols import SchedulerProtocol
+from src.utils.protocols import SchedulerProtocol
 
 class Trainer:
     """

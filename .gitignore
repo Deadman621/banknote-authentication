@@ -25,7 +25,6 @@ lightning_logs/
 # Grad-CAM & evaluation outputs
 gradcam_outputs/
 predictions/
-inference/
 outputs/
 results/
 
