@@ -3,10 +3,11 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from src.training.checkpoint import (
+from src.checkpoint.io import (
     load_checkpoint,
     save_checkpoint,
 )
+from src.checkpoint.state import CheckpointState
 
 
 def create_components() -> tuple[
@@ -49,14 +50,14 @@ def test_save_and_load_checkpoint(
         create_components()
     )
 
-    epoch, step = load_checkpoint(
+    state: CheckpointState = load_checkpoint(
         checkpoint_path,
         new_model,
         new_optimizer,
     )
 
-    assert epoch == 5
-    assert step == 100
+    assert state.epoch == 5
+    assert state.global_step == 100
 
 
 def test_checkpoint_restores_weights(

@@ -13,7 +13,7 @@ from src.training.amp import AMPContext
 from src.training.callbacks.base import Callback
 from src.training.metrics import accuracy
 from src.training.state import TrainState
-from src.training.protocols import SchedulerProtocol
+from src.utils.protocols import SchedulerProtocol
 from src.training.utils import move_batch_to_device
 
 from torch.utils.data import DataLoader

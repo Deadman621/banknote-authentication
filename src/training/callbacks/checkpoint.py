@@ -10,7 +10,7 @@ from torch.optim import Optimizer
 
 from src.core.config import CheckpointConfig
 from src.training.callbacks.base import Callback
-from src.training.checkpoint import (
+from src.checkpoint.io import (
     SchedulerProtocol,
     save_checkpoint,
 )
