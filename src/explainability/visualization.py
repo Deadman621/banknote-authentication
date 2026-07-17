@@ -33,7 +33,7 @@ def validate_image(image: NDArray[np.uint8]) -> None:
         raise ValueError("Image dtype must be uint8.")
 
 
-def validate_heatmap( heatmap: NDArray[np.float32], image_shape: tuple[int, int]) -> None:
+def validate_heatmap(heatmap: NDArray[np.float32], image_shape: tuple[int, int]) -> None:
     """
     Validate a normalized Grad-CAM heatmap.
 
