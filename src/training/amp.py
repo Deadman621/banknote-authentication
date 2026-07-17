@@ -60,6 +60,14 @@ class AMPContext:
 
         optimizer.step()
 
+    def unscale_(self, optimizer: Optimizer) -> None:
+        """
+        Unscale gradients before clipping when AMP is enabled.
+        """
+
+        if self.enabled:
+            self.scaler.unscale_(optimizer)
+
     def zero_grad(self, optimizer: Optimizer) -> None:
         """
         Clear gradients.

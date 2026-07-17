@@ -1,0 +1,15 @@
+module:
+	name: authenticity
+
+dataset:
+	root: data/raw/authenticity
+	metadata_path: reports/authenticity_metadata.csv
+	image_column: image_path
+	label_column: authenticity
+	label_map:
+		Genuine: 0
+		Counterfeit: 1
+	num_classes: 2
+	class_names:
+		- Genuine
+		- Counterfeit

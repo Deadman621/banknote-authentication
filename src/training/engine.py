@@ -7,6 +7,7 @@ from collections.abc import Iterable
 import torch
 from torch import Tensor, nn
 from torch.optim import Optimizer
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from typing import Protocol
 
 from src.training.amp import AMPContext
@@ -36,6 +37,7 @@ class TrainingEngine:
         device: torch.device,
         amp: AMPContext,
         scheduler: SchedulerProtocol | None = None,
+        gradient_clip: float | None = None,
         callbacks: Iterable[Callback] = (),
     ) -> None:
         self.model = model
@@ -44,6 +46,7 @@ class TrainingEngine:
         self.scheduler = scheduler
         self.device = device
         self.amp = amp
+        self.gradient_clip = gradient_clip
 
         self.callbacks = list(callbacks)
 
@@ -71,6 +74,14 @@ class TrainingEngine:
             loss = self.loss_fn(logits, labels)
 
         self.amp.backward( loss, self.optimizer)
+
+        if self.gradient_clip is not None:
+            self.amp.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(),
+                self.gradient_clip,
+            )
+
         self.amp.step(self.optimizer)
         batch_accuracy = accuracy(logits.detach(), labels)
 
@@ -156,7 +167,10 @@ class TrainingEngine:
             self.validate_epoch(validation_loader)
 
             if self.scheduler is not None:
-                self.scheduler.step()
+                if isinstance(self.scheduler, ReduceLROnPlateau):
+                    self.scheduler.step(self.state.validation_loss)
+                else:
+                    self.scheduler.step()
 
             if self.state.should_stop:
                 break

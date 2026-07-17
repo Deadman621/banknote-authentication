@@ -1,0 +1,12 @@
+module:
+	name: quality
+
+dataset:
+	root: data/raw/quality
+	metadata_path: null
+	image_column: image_path
+	label_column: quality
+	num_classes: 2
+	class_names:
+		- Good
+		- Damaged

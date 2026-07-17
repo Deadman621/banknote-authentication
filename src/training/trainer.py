@@ -46,6 +46,7 @@ class Trainer:
                 enabled=config.trainer.mixed_precision,
                 device=device,
             ),
+            gradient_clip=config.trainer.gradient_clip,
             callbacks=callbacks,
         )
 

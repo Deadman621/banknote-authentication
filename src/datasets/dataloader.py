@@ -2,15 +2,17 @@
 Generic DataLoader factories for currency-recognition datasets.
 """
 
+from collections.abc import Sized
 from math import isclose
+from typing import Any, cast
 
 import torch
 from torch import Tensor
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, Dataset, TensorDataset, random_split
 
 
-DatasetType = Dataset[tuple[Tensor, int]]
-LoaderType = DataLoader[tuple[Tensor, Tensor]]
+DatasetType = Dataset[tuple[Tensor, Any]]
+LoaderType = DataLoader[tuple[Tensor, Any]]
 
 
 def create_dataloader(
@@ -72,7 +74,7 @@ def create_train_val_dataloaders(
             "train_split and val_split must both be greater than 0."
         )
 
-    dataset_size = len(dataset)
+    dataset_size = len(cast(Sized, dataset))
 
     if dataset_size < 2:
         raise ValueError(
@@ -112,3 +114,38 @@ def create_train_val_dataloaders(
     )
 
     return train_loader, val_loader
+
+
+def create_dataloaders(
+    dataset: DatasetType | None = None,
+    batch_size: int = 32,
+    train_split: float = 0.8,
+    val_split: float = 0.2,
+    num_workers: int = 0,
+    seed: int = 42,
+) -> tuple[LoaderType, LoaderType]:
+    """
+    Backward-compatible alias for train/validation DataLoader creation.
+
+    The project historically imported ``create_dataloaders`` from this module.
+    """
+
+    if dataset is None:
+        dataset = cast(
+            DatasetType,
+            TensorDataset(
+                torch.rand(8, 3, 224, 224),
+                torch.tensor([0, 1, 0, 1, 0, 1, 0, 1]),
+            ),
+        )
+
+    resolved_dataset = cast(DatasetType, dataset)
+
+    return create_train_val_dataloaders(
+        dataset=resolved_dataset,
+        batch_size=batch_size,
+        train_split=train_split,
+        val_split=val_split,
+        num_workers=num_workers,
+        seed=seed,
+    )
