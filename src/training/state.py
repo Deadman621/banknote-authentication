@@ -28,4 +28,6 @@ class TrainState:
 
     best_metric: float = 0.0
 
+    total_batches: int = 0
+
     should_stop: bool = False

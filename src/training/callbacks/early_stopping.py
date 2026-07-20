@@ -48,9 +48,7 @@ class EarlyStoppingCallback(Callback):
             return True
 
         # Losses normally decrease.
-        if self.config.monitor.endswith(
-            "loss"
-        ):
+        if self.config.monitor.endswith("loss"):
             return value < self.best_metric
 
         # Accuracy-style metrics increase.

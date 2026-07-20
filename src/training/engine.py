@@ -92,6 +92,8 @@ class TrainingEngine:
         Train for one epoch.
         """
 
+        self.state.total_batches = len(loader)
+
         total_loss = 0.0
         total_accuracy = 0.0
         batches = 0
@@ -115,9 +117,6 @@ class TrainingEngine:
 
             for callback in self.callbacks:
                 callback.on_batch_end(self.state)
-
-        for callback in self.callbacks:
-            callback.on_epoch_end(self.state)
 
     def validate_epoch(self, loader: DataLoader) -> None:
         """
@@ -157,21 +156,26 @@ class TrainingEngine:
         """
 
         for callback in self.callbacks:
-            callback.on_train_begin(
-                self.state
-            )
+            callback.on_train_begin(self.state)
 
         for epoch in range(epochs):
             self.state.epoch = epoch + 1
+
             self.train_epoch(train_loader)
             self.validate_epoch(validation_loader)
 
+            # Entire epoch is finished
+            for callback in self.callbacks:
+                callback.on_epoch_end(self.state)
+
+            # Update scheduler
             if self.scheduler is not None:
                 if isinstance(self.scheduler, ReduceLROnPlateau):
                     self.scheduler.step(self.state.validation_loss)
                 else:
                     self.scheduler.step()
 
+            # Early stopping
             if self.state.should_stop:
                 break
 
