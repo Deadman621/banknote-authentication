@@ -34,7 +34,6 @@ class EarlyStoppingConfig:
 class CheckpointConfig:
     monitor: str
     mode: str
-    save_best_only: bool
 
 @dataclass(frozen=True, slots=True)
 class TrainerConfig:

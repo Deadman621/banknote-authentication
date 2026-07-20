@@ -228,12 +228,7 @@ def parse_trainer_config(cfg: Mapping[str, object]) -> TrainerConfig:
         ),
         checkpoint=CheckpointConfig(
             monitor=require(checkpoint_cfg, "monitor", str),
-            mode=require(checkpoint_cfg, "mode", str),
-            save_best_only=require(
-                checkpoint_cfg,
-                "save_best_only",
-                bool,
-            ),
+            mode=require(checkpoint_cfg, "mode", str)
         ),
     )
 

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.training.state import TrainState
-
+    from src.checkpoint.state import CheckpointState
 
 class Callback:
     """
@@ -36,4 +36,7 @@ class Callback:
         pass
 
     def on_validation_end(self, state: TrainState) -> None:
+        pass
+
+    def restore_checkpoint(self, checkpoint: CheckpointState) -> None:
         pass

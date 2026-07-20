@@ -81,8 +81,6 @@ def create_config(
             checkpoint=CheckpointConfig(
                 monitor="validation_loss",
                 mode="min",
-                save_best_only=True,
-            ),
         ),
 
         optimizer=OptimizerConfig(
@@ -156,7 +154,7 @@ def test_phase5_training_integration(
 
         CheckpointCallback(
             config=config.trainer.checkpoint,
-            path=checkpoint_path,
+            directory=checkpoint_path,
             model=model,
             optimizer=optimizer,
         ),

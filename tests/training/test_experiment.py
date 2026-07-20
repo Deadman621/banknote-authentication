@@ -205,8 +205,7 @@ def test_parse_trainer_config() -> None:
         },
         "checkpoint": {
             "monitor": "val_loss",
-            "mode": "min",
-            "save_best_only": True,
+            "mode": "min"
         },
     }
 
@@ -221,7 +220,6 @@ def test_parse_trainer_config() -> None:
 
     assert trainer.checkpoint.monitor == "val_loss"
     assert trainer.checkpoint.mode == "min"
-    assert trainer.checkpoint.save_best_only is True
 
 def test_parse_config() -> None:
     cfg = load_config_dict(

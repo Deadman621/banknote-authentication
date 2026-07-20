@@ -435,7 +435,7 @@ def build_trainer(bundle: ExperimentBundle, model: nn.Module, class_names: Seque
         EarlyStoppingCallback(bundle.config.trainer.early_stopping),
         CheckpointCallback(
             config=bundle.config.trainer.checkpoint,
-            path=bundle.paths.checkpoints / "best.pt",
+            directory=bundle.paths.checkpoints,
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
@@ -596,10 +596,9 @@ def load_experiment_bundle(experiment_root: Path, checkpoint_name: str = "best.p
     model = build_model_from_config(config)
 
     checkpoint_path = experiment_root / "checkpoints" / checkpoint_name
+
     if not checkpoint_path.exists():
-        fallback = experiment_root / "checkpoints" / "final.pt"
-        if fallback.exists():
-            checkpoint_path = fallback
+        checkpoint_path = experiment_root / "checkpoints" / "last.pt"
 
     if not checkpoint_path.exists():
         raise FileNotFoundError(checkpoint_path)

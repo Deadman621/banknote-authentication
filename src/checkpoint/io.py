@@ -11,7 +11,7 @@ from torch.optim import Optimizer
 from src.utils.protocols import SchedulerProtocol
 from src.checkpoint.state import CheckpointState
 
-def save_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer, epoch: int, global_step: int, scheduler: SchedulerProtocol | None = None) -> None:
+def save_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer, epoch: int, global_step: int, scheduler: SchedulerProtocol | None = None, best_metric: float | None = None,) -> None:
     """
     Save training checkpoint.
     """
@@ -21,6 +21,7 @@ def save_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer, epoch: i
         "global_step": global_step,
         "model_state_dict": model.state_dict(),
         "optimizer_state_dict": optimizer.state_dict(),
+        "best_metric": best_metric,
     }
 
     if scheduler is not None:
@@ -47,6 +48,7 @@ def load_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer | None = 
     return (
         CheckpointState(
             int(checkpoint["epoch"]), 
-            int(checkpoint["global_step"])
+            int(checkpoint["global_step"]),
+            best_metric=checkpoint.get("best_metric")
         )
     )

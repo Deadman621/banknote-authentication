@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import Optional
 
 from scripts._common import (
     build_model_from_config,
@@ -11,6 +12,9 @@ from scripts._common import (
     prepare_experiment,
     save_evaluation_result,
 )
+
+from src.checkpoint.io import save_checkpoint, load_checkpoint
+from src.training.state import TrainState
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,6 +32,12 @@ def parse_args() -> argparse.Namespace:
         default=0.8,
         help="Fraction of samples used for training.",
     )
+    parser.add_argument(
+        "--resume",
+        type=Path,
+        default=None,
+        help="Resume training from a checkpoint.",
+    )
     return parser.parse_args()
 
 
@@ -43,6 +53,29 @@ def main() -> None:
 
     model = build_model_from_config(bundle.config)
     trainer, optimizer, scheduler = build_trainer(bundle, model, class_names, class_weights)
+    resume_state: Optional[TrainState] = None
+
+    if args.resume is not None:
+        checkpoint = load_checkpoint(
+            path=args.resume,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+        )
+
+        trainer.restore_checkpoint(checkpoint)
+
+        resume_state = TrainState(
+            epoch=checkpoint.epoch,
+            global_step=checkpoint.global_step,
+        )
+
+        bundle.logger.info(
+            "Resumed training from %s (epoch=%d, step=%d)",
+            args.resume,
+            checkpoint.epoch,
+            checkpoint.global_step,
+        )
 
     bundle.logger.info(
         "Starting training for module=%s model=%s on %s",
@@ -51,27 +84,15 @@ def main() -> None:
         bundle.device,
     )
 
-    state = trainer.fit(train_loader=train_loader, validation_loader=val_loader)
-
-    final_checkpoint = bundle.paths.checkpoints / "final.pt"
-    from src.checkpoint.io import save_checkpoint
-
-    save_checkpoint(
-        path=final_checkpoint,
-        model=model,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        epoch=state.epoch,
-        global_step=state.global_step,
-    )
+    state = trainer.fit(train_loader=train_loader, validation_loader=val_loader, initial_state=resume_state)
 
     evaluation = evaluate_model(bundle, model, val_loader)
     save_evaluation_result(evaluation, bundle.paths.evaluation, class_names)
 
     bundle.logger.info(
-        "Training complete | best checkpoint=%s | final checkpoint=%s",
+        "Training complete | best checkpoint=%s | last checkpoint=%s",
         bundle.paths.checkpoints / "best.pt",
-        final_checkpoint,
+        bundle.paths.checkpoints / "last.pt",
     )
 
 

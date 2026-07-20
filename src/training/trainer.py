@@ -4,11 +4,15 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
+from typing import Optional
+
 import torch
+
 from torch import nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
+from src.checkpoint.state import CheckpointState
 from src.core.config import ExperimentConfig
 from src.training.state import TrainState
 from src.training.amp import AMPContext
@@ -48,9 +52,13 @@ class Trainer:
             ),
             gradient_clip=config.trainer.gradient_clip,
             callbacks=callbacks,
-        )
+        ) 
 
-    def fit(self, train_loader: DataLoader, validation_loader: DataLoader) -> TrainState:
+    def restore_checkpoint(self, checkpoint: CheckpointState) -> None:
+        for callback in self.engine.callbacks:
+            callback.restore_checkpoint(checkpoint)
+
+    def fit(self, train_loader: DataLoader, validation_loader: DataLoader, initial_state: Optional[TrainState] = None) -> TrainState:
         """
         Start training.
         """
@@ -59,4 +67,5 @@ class Trainer:
             train_loader=train_loader,
             validation_loader=validation_loader,
             epochs=self.config.trainer.epochs,
+            initial_state=initial_state,
         )

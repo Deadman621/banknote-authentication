@@ -8,7 +8,7 @@ import torch
 from torch import Tensor, nn
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from typing import Protocol
+from typing import Protocol, Optional
 
 from src.training.amp import AMPContext
 from src.training.callbacks.base import Callback
@@ -150,15 +150,24 @@ class TrainingEngine:
             callback.on_validation_end(self.state)
 
 
-    def fit(self, train_loader: DataLoader, validation_loader: DataLoader, epochs: int) -> TrainState:
+    def fit(
+            self, 
+            train_loader: DataLoader, 
+            validation_loader: DataLoader, 
+            epochs: int, 
+            initial_state: Optional[TrainState]
+        ) -> TrainState:
         """
         Execute full training loop.
         """
+        if initial_state is not None:
+            self.state = initial_state
 
         for callback in self.callbacks:
             callback.on_train_begin(self.state)
-
-        for epoch in range(epochs):
+        
+        start_epoch = self.state.epoch
+        for epoch in range(start_epoch, epochs):
             self.state.epoch = epoch + 1
 
             self.train_epoch(train_loader)

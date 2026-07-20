@@ -26,10 +26,9 @@ def test_checkpoint_callback_saves_best(
     callback = CheckpointCallback(
         config=CheckpointConfig(
             monitor="validation_loss",
-            mode="min",
-            save_best_only=True,
+            mode="min"
         ),
-        path=tmp_path / "best.pt",
+        directory=tmp_path / "best.pt",
         model=model,
         optimizer=optimizer,
     )
@@ -63,10 +62,9 @@ def test_checkpoint_callback_skips_worse_metric(
     callback = CheckpointCallback(
         config=CheckpointConfig(
             monitor="validation_loss",
-            mode="min",
-            save_best_only=True,
+            mode="min"
         ),
-        path=tmp_path / "best.pt",
+        directory=tmp_path / "best.pt",
         model=model,
         optimizer=optimizer,
     )

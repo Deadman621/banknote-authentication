@@ -57,7 +57,6 @@ def create_config() -> ExperimentConfig:
             checkpoint=CheckpointConfig(
                 monitor="validation_loss",
                 mode="min",
-                save_best_only=True,
             ),
         ),
         optimizer=OptimizerConfig(

@@ -9,6 +9,7 @@ from torch import nn
 from torch.optim import Optimizer
 
 from src.core.config import CheckpointConfig
+from src.checkpoint.state import CheckpointState
 from src.training.callbacks.base import Callback
 from src.checkpoint.io import (
     SchedulerProtocol,
@@ -20,12 +21,17 @@ if TYPE_CHECKING:
 
 class CheckpointCallback(Callback):
     """
-    Saves model checkpoints during training.
+    Saves training checkpoints.
+
+    - last.pt is written after every epoch.
+    - best.pt is updated whenever the monitored metric improves.
     """
 
-    def __init__(self, config: CheckpointConfig, path: Path, model: nn.Module, optimizer: Optimizer, scheduler: SchedulerProtocol | None = None) -> None:
+    def __init__(self, config: CheckpointConfig, directory: Path, model: nn.Module, optimizer: Optimizer, scheduler: SchedulerProtocol | None = None) -> None:
         self.config = config
-        self.path = path
+        self.directory = directory
+        self.best_path = directory / "best.pt"
+        self.last_path = directory / "last.pt"
 
         self.model = model
         self.optimizer = optimizer
@@ -34,22 +40,44 @@ class CheckpointCallback(Callback):
         self.best_metric: float | None = None
 
     def on_epoch_end(self, state: TrainState) -> None:
+        """
+        Save checkpoints after each epoch.
+
+        - last.pt is always updated so training can be resumed.
+        - best.pt is updated only when the monitored metric improves.
+        """
+
         metric = self._get_metric(state)
 
-        if self.config.save_best_only:
-            if not self._is_improvement(metric):
-                return
+        improved = self._is_improvement(metric)
+        if improved:
+            self.best_metric = metric
 
+        # Always save the latest checkpoint
         save_checkpoint(
-            path=self.path,
+            path=self.last_path,
             model=self.model,
             optimizer=self.optimizer,
             scheduler=self.scheduler,
             epoch=state.epoch,
             global_step=state.global_step,
+            best_metric=self.best_metric,
         )
 
-        self.best_metric = metric
+        # Save best checkpoint only on improvement
+        if improved:
+            save_checkpoint(
+                path=self.best_path,
+                model=self.model,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+                epoch=state.epoch,
+                global_step=state.global_step,
+                best_metric=self.best_metric,
+            )
+
+    def restore_checkpoint(self, checkpoint: CheckpointState) -> None:
+        self.best_metric = checkpoint.best_metric
 
     def _get_metric(self, state: TrainState) -> float:
         value = getattr(state, self.config.monitor, None)
