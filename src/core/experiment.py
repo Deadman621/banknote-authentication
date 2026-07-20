@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 from datetime import datetime
 from typing import TypeAlias
 from copy import deepcopy
@@ -24,6 +24,10 @@ from src.core.config import (
     TrainerConfig,
     EarlyStoppingConfig,
     CheckpointConfig,
+    CannyConfig,
+    ContourConfig,
+    AlignedOutputConfig,
+    PreprocessingConfig
 )
 
 T = TypeVar("T")
@@ -113,15 +117,20 @@ def load_config_dict(module: str, model: str) -> ConfigDict:
 
     return config
 
-def require(mapping: Mapping[str, object], key: str, expected_type: type[T]) -> T:
+def require(mapping: Mapping[str, object], key: str, expected_type: type[T] | tuple[type[Any], ...]) -> T:
     value = mapping.get(key)
 
     if not isinstance(value, expected_type):
+        if isinstance(expected_type, tuple):
+            expected = " or ".join(t.__name__ for t in expected_type)
+        else:
+            expected = expected_type.__name__
+
         raise TypeError(
-            f"Expected '{key}' to be {expected_type.__name__}."
+            f"Expected '{key}' to be {expected}."
         )
 
-    return value
+    return cast(T, value)
 
 
 def require_mapping(mapping: Mapping[str, object], key: str) -> Mapping[str, object]:
@@ -228,6 +237,37 @@ def parse_trainer_config(cfg: Mapping[str, object]) -> TrainerConfig:
         ),
     )
 
+def parse_preprocessing_config(cfg: Mapping[str, object]) -> PreprocessingConfig:
+    canny_cfg = require_mapping(cfg, "canny")
+    contour_cfg = require_mapping(cfg, "contour")
+    output_cfg = require_mapping(cfg, "aligned_output")
+
+    kernel = require(cfg, "gaussian_kernel", list)
+
+    if len(kernel) != 2:
+        raise ValueError("'gaussian_kernel' must contain exactly two integers.")
+
+    return PreprocessingConfig(
+        gaussian_kernel=(int(kernel[0]), int(kernel[1])),
+        gaussian_sigma=float(require(cfg, "gaussian_sigma", (int, float))),
+        resize_max_dim=require(cfg, "resize_max_dim", int),
+        debug=require(cfg, "debug", bool),
+        debug_output_dir=require(cfg, "debug_output_dir", str),
+        canny=CannyConfig(
+            adaptive=require(canny_cfg, "adaptive", bool),
+            lower=require(canny_cfg, "lower", int),
+            upper=require(canny_cfg, "upper", int),
+        ),
+        contour=ContourConfig(
+            min_area_ratio=float(require(contour_cfg, "min_area_ratio", (int, float))),
+            approx_epsilon=float(require(contour_cfg, "approx_epsilon", (int, float))),
+        ),
+        aligned_output=AlignedOutputConfig(
+            width=require(output_cfg, "width", int),
+            height=require(output_cfg, "height", int),
+        ),
+    )
+
 def parse_config(cfg: Mapping[str, object]) -> ExperimentConfig:
     return ExperimentConfig(
         seed=require(cfg, "seed", int),
@@ -267,6 +307,10 @@ def parse_config(cfg: Mapping[str, object]) -> ExperimentConfig:
 
         output=parse_output_config(
             require_mapping(cfg, "output")
+        ),
+
+        preprocessing=parse_preprocessing_config(
+            require_mapping(cfg, "preprocessing")
         ),
     )
 

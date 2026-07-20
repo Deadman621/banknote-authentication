@@ -22,11 +22,7 @@ class DenominationDataset(CurrencyDataset):
         10 (4).jpg  -> denomination 10
     """
 
-    def __init__(
-        self,
-        root: str | Path,
-        transform: Callable[[Image.Image], Tensor] | None = None,
-    ) -> None:
+    def __init__(self, root: str | Path, transform: Callable[[Image.Image], Tensor] | None = None) -> None:
         self.class_to_index: dict[str, int] = {}
         self.index_to_class: dict[int, str] = {}
 

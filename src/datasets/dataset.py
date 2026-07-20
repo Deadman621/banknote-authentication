@@ -28,11 +28,7 @@ class CurrencyDataset(Dataset[tuple[Tensor, int]], ABC):
     by implementing build_samples().
     """
 
-    def __init__(
-        self,
-        root: str | Path,
-        transform: Callable[[Image.Image], Tensor] | None = None,
-    ) -> None:
+    def __init__(self, root: str | Path, transform: Callable[[Image.Image], Tensor] | None = None) -> None:
         self.root = Path(root)
         self.transform = transform
 

@@ -17,3 +17,21 @@ logging:
 
 output:
   save_dir: experiments
+
+preprocessing:
+  resize_max_dim: 1500
+
+  gaussian_kernel: [5, 5]
+  gaussian_sigma: 0
+
+  debug: false
+  debug_output_dir: data/processed
+
+  canny:
+    adaptive: true
+    lower: 50
+    upper: 150
+
+  contour:
+    min_area_ratio: 0.10
+    approx_epsilon: 0.02

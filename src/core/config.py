@@ -85,13 +85,43 @@ class ExperimentConfig:
     device: str
 
     experiment: ExperimentSettings
-
     dataset: DatasetConfig
     trainer: TrainerConfig
     optimizer: OptimizerConfig
     scheduler: SchedulerConfig
     loss: LossConfig
     model: ModelConfig
-
     logging: LoggingConfig
     output: OutputConfig
+    preprocessing: PreprocessingConfig
+
+@dataclass(slots=True)
+class CannyConfig:
+    adaptive: bool
+    lower: int
+    upper: int
+
+
+@dataclass(slots=True)
+class ContourConfig:
+    min_area_ratio: float
+    approx_epsilon: float
+
+
+@dataclass(slots=True)
+class AlignedOutputConfig:
+    width: int
+    height: int
+
+
+@dataclass(slots=True)
+class PreprocessingConfig:
+    gaussian_kernel: tuple[int, int]
+    gaussian_sigma: float
+    canny: CannyConfig
+    contour: ContourConfig
+    aligned_output: AlignedOutputConfig
+    resize_max_dim: int
+    debug: bool = False
+    debug_output_dir: str = "data/processed"
+    log_level: str = "INFO"
