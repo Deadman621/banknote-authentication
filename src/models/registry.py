@@ -10,7 +10,7 @@ import torch.nn as nn
 from .resnet50 import ResNet50
 from .efficientnet_b0 import EfficientNetB0
 from .swin_transformer import SwinTransformer
-
+from .cnn import CNN
 
 class ModelRegistry:
     """
@@ -18,6 +18,7 @@ class ModelRegistry:
     """
 
     _MODELS: Dict[str, Type[nn.Module]] = {
+        "cnn": CNN,
         "resnet50": ResNet50,
         "efficientnet_b0": EfficientNetB0,
         "swin_transformer": SwinTransformer,
@@ -30,13 +31,7 @@ class ModelRegistry:
     }
 
     @classmethod
-    def get_model(
-        cls,
-        model_name: str,
-        num_classes: int,
-        pretrained: bool = True,
-        **kwargs,
-    ) -> nn.Module:
+    def get_model(cls, model_name: str, num_classes: int, pretrained: bool = True, **kwargs) -> nn.Module:
         """
         Returns an initialized model based on its name.
         """

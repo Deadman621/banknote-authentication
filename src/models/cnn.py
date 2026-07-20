@@ -8,10 +8,7 @@ from torch import Tensor, nn
 class CNN(nn.Module):
     """A simple convolutional neural network for image classification."""
 
-    def __init__(
-        self,
-        num_classes: int = 2,
-    ) -> None:
+    def __init__(self, num_classes: int = 2, pretrained: bool = False) -> None:
         super().__init__()
 
         self.features = nn.Sequential(
