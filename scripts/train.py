@@ -35,14 +35,14 @@ def main() -> None:
     args = parse_args()
     bundle = prepare_experiment(args.module, args.model, args.experiment_name)
 
-    train_loader, val_loader, class_names = build_training_loaders(  # type: ignore[name-defined]
+    train_loader, val_loader, class_names, class_weights = build_training_loaders(
         args.module,
         bundle,
         train_split=args.train_split,
     )
 
     model = build_model_from_config(bundle.config)
-    trainer, optimizer, scheduler = build_trainer(bundle, model, class_names)
+    trainer, optimizer, scheduler = build_trainer(bundle, model, class_names, class_weights)
 
     bundle.logger.info(
         "Starting training for module=%s model=%s on %s",

@@ -25,8 +25,9 @@ class ProgressCallback(Callback):
         """
 
         self.progress_bar = tqdm(
+            total=state.total_batches,
             desc=f"Epoch {state.epoch}",
-            leave=False,
+            leave=True,
         )
 
     def on_batch_end(self, state: TrainState) -> None:
@@ -47,12 +48,9 @@ class ProgressCallback(Callback):
         )
 
     def on_epoch_end(self, state: TrainState) -> None:
-        """
-        Close progress bar.
-        """
-
         if self.progress_bar is None:
             return
 
         self.progress_bar.close()
+        print(end='\n')
         self.progress_bar = None

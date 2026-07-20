@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from src.training.callbacks.base import Callback
+from tqdm import tqdm
 
 
 if TYPE_CHECKING:
@@ -27,17 +28,12 @@ class LoggingCallback(Callback):
         self.logger.info("Training started.")
 
     def on_epoch_end(self, state: TrainState) -> None:
-        self.logger.info(
-            "Epoch %d completed | "
-            "train_loss=%.4f | "
-            "val_loss=%.4f | "
-            "train_acc=%.4f | "
-            "val_acc=%.4f",
-            state.epoch,
-            state.train_loss,
-            state.validation_loss,
-            state.train_accuracy,
-            state.validation_accuracy,
+        tqdm.write(
+            f"Epoch {state.epoch} completed | "
+            f"train_loss={state.train_loss:.4f} | "
+            f"val_loss={state.validation_loss:.4f} | "
+            f"train_acc={state.train_accuracy:.4f} | "
+            f"val_acc={state.validation_accuracy:.4f}"
         )
 
     def on_train_end(self, state: TrainState) -> None:

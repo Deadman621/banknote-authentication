@@ -9,6 +9,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
+from collections import defaultdict, Counter
 
 import numpy as np
 import torch
@@ -279,39 +280,82 @@ def encode_samples(raw_samples: Sequence[tuple[Path, str]], dataset_config: Mapp
     return encoded_samples, ordered_class_names
 
 
-def split_indices(count: int, train_split: float, seed: int) -> tuple[list[int], list[int]]:
+def split_indices(labels: Sequence[int], train_split: float, seed: int) -> tuple[list[int], list[int]]:
     if not 0.0 < train_split < 1.0:
-        raise ValueError("train_split must be in the open interval (0, 1).")
+        raise ValueError("train_split must be between 0 and 1.")
 
-    indices = torch.randperm(count, generator=torch.Generator().manual_seed(seed)).tolist()
-    train_count = int(count * train_split)
+    rng = np.random.default_rng(seed)
 
-    if train_count <= 0 or train_count >= count:
-        raise ValueError("The requested split would produce an empty partition.")
+    class_indices: dict[int, list[int]] = defaultdict(list)
 
-    return indices[:train_count], indices[train_count:]
+    for index, label in enumerate(labels):
+        class_indices[label].append(index)
 
+    train_indices: list[int] = []
+    val_indices: list[int] = []
 
-def build_training_loaders(module: str, bundle: Any, train_split: float = 0.8) -> tuple[DataLoader, DataLoader, tuple[str, ...]]:
+    for indices in class_indices.values():
+
+        indices = np.array(indices)
+
+        rng.shuffle(indices)
+
+        split = int(len(indices) * train_split)
+
+        train_indices.extend(indices[:split].tolist())
+        val_indices.extend(indices[split:].tolist())
+
+    rng.shuffle(train_indices)
+    rng.shuffle(val_indices)
+
+    return train_indices, val_indices
+
+def build_training_loaders(module: str, bundle: Any, train_split: float = 0.8) -> tuple[DataLoader, DataLoader, tuple[str, ...], torch.Tensor]:
+
     raw_samples = collect_raw_samples(module, bundle.raw_config)
+
     encoded_samples, class_names = encode_samples(
-        raw_samples,
-        _get_dataset_config(bundle.raw_config),
+        raw_samples, _get_dataset_config(bundle.raw_config),
+    )
+
+    # Calculate class weights
+    labels = [label for _, label in encoded_samples]
+
+    counts = Counter(labels)
+
+    num_samples = len(labels)
+    num_classes = len(class_names)
+
+    class_weights = torch.tensor(
+        [
+            num_samples / (num_classes * counts[index])
+            for index in range(num_classes)
+        ],
+        dtype=torch.float32,
     )
 
     train_indices, val_indices = split_indices(
-        count=len(encoded_samples),
+        labels=labels,
         train_split=train_split,
         seed=bundle.config.seed,
     )
 
+    print(f"Train samples: {len(train_indices)}")
+    print(f"Validation samples: {len(val_indices)}")
+    print(f"Overlap: {len(set(train_indices) & set(val_indices))}")
+
     train_dataset = ImageSampleDataset(
         encoded_samples,
-        transform=build_train_transforms(bundle.config.dataset.image_size),
+        transform=build_train_transforms(
+            bundle.config.dataset.image_size
+        ),
     )
+
     val_dataset = ImageSampleDataset(
         encoded_samples,
-        transform=build_eval_transforms(bundle.config.dataset.image_size),
+        transform=build_eval_transforms(
+            bundle.config.dataset.image_size
+        ),
     )
 
     train_loader = create_dataloader(
@@ -321,6 +365,7 @@ def build_training_loaders(module: str, bundle: Any, train_split: float = 0.8) -
         num_workers=bundle.config.dataset.num_workers,
         pin_memory=bundle.config.dataset.pin_memory,
     )
+
     val_loader = create_dataloader(
         dataset=Subset(val_dataset, val_indices),
         batch_size=bundle.config.dataset.batch_size,
@@ -329,8 +374,13 @@ def build_training_loaders(module: str, bundle: Any, train_split: float = 0.8) -
         pin_memory=bundle.config.dataset.pin_memory,
     )
 
-    return train_loader, val_loader, class_names
+    # DEBUG ONLY
+    # =============================================
+    print("Class names:", class_names)
+    print("Class weights:", class_weights)
+    # =============================================
 
+    return train_loader, val_loader, class_names, class_weights
 
 def build_evaluation_loader(module: str, bundle: Any) -> tuple[DataLoader, tuple[str, ...]]:
     raw_samples = collect_raw_samples(module, bundle.raw_config)
@@ -370,14 +420,18 @@ def build_model_from_config(config: ExperimentConfig) -> nn.Module:
     )
 
 
-def build_trainer(bundle: ExperimentBundle, model: nn.Module, class_names: Sequence[str]) -> tuple[Trainer, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler | torch.optim.lr_scheduler.ReduceLROnPlateau | None]:
-    loss_fn = build_loss(bundle.config.loss)
+def build_trainer(bundle: ExperimentBundle, model: nn.Module, class_names: Sequence[str], class_weights: torch.Tensor | None = None,
+) -> tuple[Trainer, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler | torch.optim.lr_scheduler.ReduceLROnPlateau | None]:
+    if class_weights is not None:
+        class_weights = class_weights.to(bundle.device)
+    
+    loss_fn = build_loss(bundle.config.loss, class_weights=class_weights)
     optimizer = build_optimizer(model, bundle.config.optimizer)
     scheduler = build_scheduler(optimizer, bundle.config.scheduler)
 
     callbacks = [
-        LoggingCallback(bundle.logger),
         ProgressCallback(),
+        LoggingCallback(bundle.logger),
         EarlyStoppingCallback(bundle.config.trainer.early_stopping),
         CheckpointCallback(
             config=bundle.config.trainer.checkpoint,
