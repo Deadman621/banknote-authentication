@@ -18,12 +18,7 @@ class AuthenticityDataset(CurrencyDataset):
     Samples are supplied explicitly as image-path and integer-label pairs.
     """
 
-    def __init__(
-        self,
-        root: str | Path,
-        samples: Sequence[tuple[str | Path, int]],
-        transform: Callable[[Image.Image], Tensor] | None = None,
-    ) -> None:
+    def __init__(self, root: str | Path, samples: Sequence[tuple[str | Path, int]], transform: Callable[[Image.Image], Tensor] | None = None) -> None:
         self._provided_samples = [
             (Path(image_path), int(label))
             for image_path, label in samples

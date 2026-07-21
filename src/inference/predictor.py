@@ -13,12 +13,17 @@ class Predictor:
     def __init__(self, model: nn.Module) -> None:
         self._model = model
 
+    @property
+    def device(self) -> torch.device:
+        return next(self._model.parameters()).device
+
     def predict(self, image: Tensor) -> PredictionResult:
         """Predict a single image."""
 
+        image = image.to(self.device)
+
         with torch.inference_mode():
             logits = self._model(image)
-
             probabilities = torch.softmax(logits, dim=1).squeeze(0)
 
         predicted_class = int(torch.argmax(probabilities).item())
@@ -32,6 +37,8 @@ class Predictor:
 
     def predict_batch(self, images: Tensor) -> BatchPredictionResult:
         """Predict a batch of images."""
+
+        images = images.to(self.device)
 
         with torch.inference_mode():
             logits = self._model(images)
