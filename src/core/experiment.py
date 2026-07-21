@@ -117,6 +117,14 @@ def load_config_dict(module: str, model: str) -> ConfigDict:
 
     return config
 
+def load_preprocessing_configs():
+    cfg = load_yaml(CONFIG_DIR / "common.yaml")
+
+    preprocessing = parse_preprocessing_config(require_mapping(cfg, "preprocessing"))
+    logging = parse_logging_config(require_mapping(cfg, "logging"))
+
+    return preprocessing, logging
+
 def require(mapping: Mapping[str, object], key: str, expected_type: type[T] | tuple[type[Any], ...]) -> T:
     value = mapping.get(key)
 

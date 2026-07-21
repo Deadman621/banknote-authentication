@@ -5,16 +5,16 @@ from typing import Any
 from numpy.typing import NDArray
 
 from src.utils.image import order_points
-from src.core.config import ExperimentConfig
+from src.core.config import PreprocessingConfig
 
 from cv2.typing import MatLike
 
 class PerspectiveCorrector:
     """Warp a quadrilateral region to a fixed-size rectangle."""
 
-    def __init__(self, config: ExperimentConfig) -> None:
-        self.out_w = config.preprocessing.aligned_output.width
-        self.out_h = config.preprocessing.aligned_output.height
+    def __init__(self, config: PreprocessingConfig) -> None:
+        self.out_w = config.aligned_output.width
+        self.out_h = config.aligned_output.height
 
     def correct(self, image: MatLike, corners: NDArray[np.floating[Any] | np.integer[Any]]) -> MatLike:
         """Return a top-down warped view of the region defined by `corners`."""

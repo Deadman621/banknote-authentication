@@ -8,7 +8,7 @@ from numpy.typing import NDArray
 from src.utils.logger import get_logger
 from src.preprocessing.scanner.boundary_detector import BoundaryDetector
 from src.preprocessing.scanner.perspective_corrector import PerspectiveCorrector
-from src.core.config import ExperimentConfig
+from src.core.config import ExperimentConfig, PreprocessingConfig, LoggingConfig
 from src.utils.image import (
     save_debug_image,
     draw_contour,
@@ -19,14 +19,14 @@ from src.utils.image import (
 class NoteDetector:
     """Full CamScanner-style pipeline: detect note → warp to aligned rectangle."""
 
-    def __init__(self, config: ExperimentConfig) -> None:
+    def __init__(self, config: PreprocessingConfig, logger: LoggingConfig) -> None:
         self.config = config
-        self.log = self.log = get_logger(__name__, level=getattr(logging, config.logging.level.upper()))
-        self.resize_max = config.preprocessing.resize_max_dim
+        self.log = self.log = get_logger(__name__, level=getattr(logging, logger.level.upper()))
+        self.resize_max = config.resize_max_dim
         self.boundary = BoundaryDetector(config)
         self.perspective = PerspectiveCorrector(config)
-        self.debug = config.preprocessing.debug
-        self.debug_dir = config.preprocessing.debug_output_dir
+        self.debug = config.debug
+        self.debug_dir = config.debug_output_dir
 
     def process(self, image_or_path: str | Path | NDArray[np.uint8]) -> MatLike | None:
         """Detect the note and return an aligned top-down view."""

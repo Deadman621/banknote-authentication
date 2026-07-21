@@ -3,12 +3,19 @@ import cv2
 import numpy as np
 from pathlib import Path
 
-def load_image(path: str) -> np.ndarray:
+def load_image(path: str | Path) -> np.ndarray:
     """Load an image from disk as BGR. Raises FileNotFoundError if unreadable."""
     img = cv2.imread(path, cv2.IMREAD_COLOR)
     if img is None:
         raise FileNotFoundError(f"Could not read image: {path}")
     return img
+
+def save_image(image: np.ndarray, stage: str, output_dir: str | Path) -> Path:
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out = output_dir / f"{stage}.png"
+    cv2.imwrite(str(out), image)
+    return out    
 
 
 def resize_max_dim(image: np.ndarray, max_dim: int) -> tuple[np.ndarray, float]:

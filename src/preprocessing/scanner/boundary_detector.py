@@ -4,13 +4,13 @@ from pathlib import Path
 from typing import Any
 
 from src.utils.image import to_gray, adaptive_canny_thresholds
-from src.core.config import ExperimentConfig
+from src.core.config import PreprocessingConfig
 
 class BoundaryDetector:
     """Find the largest quadrilateral in an image (assumed to be the note)."""
 
-    def __init__(self, config: ExperimentConfig) -> None:
-        pp = config.preprocessing
+    def __init__(self, config: PreprocessingConfig) -> None:
+        pp = config
         self.gaussian_kernel = pp.gaussian_kernel
         self.gaussian_sigma = pp.gaussian_sigma
         self.canny_adaptive = pp.canny.adaptive
