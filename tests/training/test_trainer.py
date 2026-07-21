@@ -9,7 +9,10 @@ from src.core.config import (
     ExperimentConfig,
 )
 from src.core.config import (
+    AlignedOutputConfig,
+    CannyConfig,
     CheckpointConfig,
+    ContourConfig,
     EarlyStoppingConfig,
     ExperimentSettings,
     DatasetConfig,
@@ -20,6 +23,7 @@ from src.core.config import (
     ModelConfig,
     LoggingConfig,
     OutputConfig,
+    PreprocessingConfig,
 )
 
 from src.training.trainer import Trainer
@@ -79,6 +83,14 @@ def create_config() -> ExperimentConfig:
         ),
         output=OutputConfig(
             save_dir=".",
+        ),
+        preprocessing=PreprocessingConfig(
+            gaussian_kernel=(5, 5),
+            gaussian_sigma=1.0,
+            canny=CannyConfig(adaptive=True, lower=50, upper=150),
+            contour=ContourConfig(min_area_ratio=0.1, approx_epsilon=0.02),
+            aligned_output=AlignedOutputConfig(width=256, height=117),
+            resize_max_dim=1024,
         ),
     )
 

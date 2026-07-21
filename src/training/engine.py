@@ -155,7 +155,7 @@ class TrainingEngine:
             train_loader: DataLoader, 
             validation_loader: DataLoader, 
             epochs: int, 
-            initial_state: Optional[TrainState]
+            initial_state: Optional[TrainState] = None
         ) -> TrainState:
         """
         Execute full training loop.

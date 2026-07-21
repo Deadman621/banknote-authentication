@@ -26,7 +26,11 @@ def main() -> None:
     args = parse_args()
     bundle = load_experiment_bundle(Path(args.experiment_root), args.checkpoint_name)
 
-    dataloader, class_names = build_evaluation_loaders(bundle.config.experiment.name, bundle)
+    dataloader, class_names = build_evaluation_loaders(
+        bundle.module,
+        bundle,
+    )
+    
     evaluation = evaluate_model(bundle, bundle.model, dataloader)
 
     save_evaluation_result(evaluation, Path(args.experiment_root) / "evaluation", class_names)

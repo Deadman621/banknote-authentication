@@ -5,18 +5,19 @@ import json
 import logging
 import subprocess
 import sys
+from collections import Counter, defaultdict
+from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
-from collections import defaultdict, Counter
+from typing import Any
 
 import numpy as np
 import torch
 import torch.nn as nn
 from PIL import Image
 from torch import Tensor
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Subset
 
 from src.augmentation.transforms import (
     IMAGENET_MEAN,
@@ -26,15 +27,28 @@ from src.augmentation.transforms import (
 )
 from src.checkpoint.io import load_checkpoint, save_checkpoint
 from src.core.config import ExperimentConfig
-from src.core.experiment import create_experiment_paths, load_config_dict, parse_config
+from src.core.experiment import (
+    create_experiment_paths,
+    load_config_dict,
+    load_preprocessing_configs,
+    parse_config,
+)
 from src.datasets.dataloader import create_dataloader
+from src.datasets.dataset import CurrencyDataset
 from src.evaluation.evaluator import Evaluator
+from src.evaluation.serialization import serialize as serialize_eval_result
 from src.evaluation.state import EvaluationResult
 from src.explainability.gradcam import GradCAM
 from src.explainability.visualization import overlay_heatmap
+from src.inference.loader import prepare_model
 from src.inference.predictor import Predictor
-from src.inference.state import PreprocessingConfig
+from src.inference.preprocessing import preprocess_image as preprocess_inference_image
+from src.inference.state import PreprocessingConfig as InferencePreprocessingConfig
 from src.models.registry import ModelRegistry
+from src.modules.authenticity.dataset import AuthenticityDataset
+from src.modules.denomination.dataset import DenominationDataset
+from src.modules.quality.dataset import QualityDataset
+from src.preprocessing.preprocess import Preprocessor
 from src.training.callbacks.checkpoint import CheckpointCallback
 from src.training.callbacks.early_stopping import EarlyStoppingCallback
 from src.training.callbacks.logging import LoggingCallback
@@ -71,6 +85,8 @@ class ExperimentBundle:
 @dataclass(frozen=True, slots=True)
 class LoadedExperiment:
     root: Path
+    module: str
+    model_name: str
     raw_config: dict[str, Any]
     config: ExperimentConfig
     model: nn.Module
@@ -79,29 +95,32 @@ class LoadedExperiment:
     class_names: tuple[str, ...]
 
 
-class ImageSampleDataset(Dataset[tuple[Tensor, int]]):
-    def __init__(self, samples: Sequence[tuple[Path, int]], transform: Callable[[Image.Image], Tensor] | None) -> None:
-        self.samples = [(Path(path), int(label)) for path, label in samples]
-        self.transform = transform
+class ImageSampleDataset(CurrencyDataset):
+    """
+    Generic fallback dataset implementing CurrencyDataset.
+    """
 
-    def __len__(self) -> int:
-        return len(self.samples)
+    def __init__(
+        self,
+        root: str | Path,
+        samples: Sequence[tuple[str | Path, int]],
+        transform: Callable[[Image.Image], Tensor] | None = None,
+    ) -> None:
+        self._provided_samples = [
+            (Path(image_path), int(label)) for image_path, label in samples
+        ]
+        super().__init__(root=root, transform=transform)
 
-    def __getitem__(self, index: int) -> tuple[Tensor, int]:
-        image_path, label = self.samples[index]
-
-        with Image.open(image_path) as image:
-            image = image.convert("RGB")
-
-            if self.transform is None:
-                raise RuntimeError("A transform is required.")
-
-            tensor = self.transform(image)
-
-        if not isinstance(tensor, Tensor):
-            raise TypeError("Transform must return a torch.Tensor.")
-
-        return tensor, int(label)
+    def build_samples(self) -> list[tuple[Path, int]]:
+        validated_samples: list[tuple[Path, int]] = []
+        for image_path, label in self._provided_samples:
+            full_path = (
+                image_path
+                if image_path.is_absolute()
+                else self.root / image_path
+            )
+            validated_samples.append((full_path, int(label)))
+        return validated_samples
 
 
 def resolve_path(path: str | Path, base: Path = WORKSPACE_ROOT) -> Path:
@@ -125,7 +144,9 @@ def load_raw_config(module: str, model: str) -> dict[str, Any]:
     return deepcopy(raw_config)
 
 
-def prepare_experiment(module: str, model: str, experiment_name: str | None = None) -> ExperimentBundle:
+def prepare_experiment(
+    module: str, model: str, experiment_name: str | None = None
+) -> ExperimentBundle:
     raw_config = load_raw_config(module, model)
 
     if experiment_name is not None:
@@ -173,7 +194,9 @@ def _get_dataset_config(raw_config: Mapping[str, Any]) -> Mapping[str, Any]:
     return _require_mapping(raw_config.get("dataset"), "dataset")
 
 
-def _collect_denomination_samples(dataset_config: Mapping[str, Any]) -> list[tuple[Path, str]]:
+def _collect_denomination_samples(
+    dataset_config: Mapping[str, Any]
+) -> list[tuple[Path, str]]:
     root = resolve_path(dataset_config["root"])
 
     if not root.exists():
@@ -198,7 +221,9 @@ def _collect_denomination_samples(dataset_config: Mapping[str, Any]) -> list[tup
     return samples
 
 
-def _collect_tabular_samples(dataset_config: Mapping[str, Any]) -> list[tuple[Path, str]]:
+def _collect_tabular_samples(
+    dataset_config: Mapping[str, Any]
+) -> list[tuple[Path, str]]:
     metadata_value = dataset_config.get("metadata_path")
     if metadata_value in (None, ""):
         raise ValueError("metadata_path must be provided for this module.")
@@ -241,7 +266,9 @@ def _collect_tabular_samples(dataset_config: Mapping[str, Any]) -> list[tuple[Pa
     return samples
 
 
-def collect_raw_samples(module: str, raw_config: Mapping[str, Any]) -> list[tuple[Path, str]]:
+def collect_raw_samples(
+    module: str, raw_config: Mapping[str, Any]
+) -> list[tuple[Path, str]]:
     dataset_config = _get_dataset_config(raw_config)
 
     if module == "denomination":
@@ -250,7 +277,9 @@ def collect_raw_samples(module: str, raw_config: Mapping[str, Any]) -> list[tupl
     return _collect_tabular_samples(dataset_config)
 
 
-def encode_samples(raw_samples: Sequence[tuple[Path, str]], dataset_config: Mapping[str, Any]) -> tuple[list[tuple[Path, int]], tuple[str, ...]]:
+def encode_samples(
+    raw_samples: Sequence[tuple[Path, str]], dataset_config: Mapping[str, Any]
+) -> tuple[list[tuple[Path, int]], tuple[str, ...]]:
     label_map = dataset_config.get("label_map")
     class_names = dataset_config.get("class_names")
 
@@ -280,7 +309,9 @@ def encode_samples(raw_samples: Sequence[tuple[Path, str]], dataset_config: Mapp
     return encoded_samples, ordered_class_names
 
 
-def split_indices(labels: Sequence[int], train_split: float, seed: int) -> tuple[list[int], list[int]]:
+def split_indices(
+    labels: Sequence[int], train_split: float, seed: int
+) -> tuple[list[int], list[int]]:
     if not 0.0 < train_split < 1.0:
         raise ValueError("train_split must be between 0 and 1.")
 
@@ -295,32 +326,68 @@ def split_indices(labels: Sequence[int], train_split: float, seed: int) -> tuple
     val_indices: list[int] = []
 
     for indices in class_indices.values():
+        arr_indices = np.array(indices)
+        rng.shuffle(arr_indices)
+        split = int(len(arr_indices) * train_split)
 
-        indices = np.array(indices)
-
-        rng.shuffle(indices)
-
-        split = int(len(indices) * train_split)
-
-        train_indices.extend(indices[:split].tolist())
-        val_indices.extend(indices[split:].tolist())
+        train_indices.extend(arr_indices[:split].tolist())
+        val_indices.extend(arr_indices[split:].tolist())
 
     rng.shuffle(train_indices)
     rng.shuffle(val_indices)
 
     return train_indices, val_indices
 
-def build_training_loaders(module: str, bundle: Any, train_split: float = 0.8) -> tuple[DataLoader, DataLoader, tuple[str, ...], torch.Tensor]:
 
-    raw_samples = collect_raw_samples(module, bundle.raw_config)
+def build_module_dataset(
+    module: str,
+    raw_config: Mapping[str, Any],
+    transform: Callable[[Image.Image], Tensor] | None,
+) -> tuple[CurrencyDataset, tuple[str, ...]]:
+    """
+    Construct module-specific CurrencyDataset instance from src.modules.
+    """
+    dataset_config = _get_dataset_config(raw_config)
+    root = resolve_path(dataset_config.get("root", WORKSPACE_ROOT))
 
-    encoded_samples, class_names = encode_samples(
-        raw_samples, _get_dataset_config(bundle.raw_config),
+    if module == "denomination":
+        if root.exists() and root.is_dir():
+            try:
+                ds = DenominationDataset(root=root, transform=transform)
+                return ds, tuple(ds.classes)
+            except Exception:
+                pass
+
+    raw_samples = collect_raw_samples(module, raw_config)
+    encoded_samples, class_names = encode_samples(raw_samples, dataset_config)
+
+    if module == "authenticity":
+        ds = AuthenticityDataset(root=root, samples=encoded_samples, transform=transform)
+    elif module == "quality":
+        ds = QualityDataset(root=root, samples=encoded_samples, transform=transform)
+    else:
+        ds = ImageSampleDataset(root=root, samples=encoded_samples, transform=transform)
+
+    return ds, class_names
+
+
+def build_training_loaders(
+    module: str, bundle: Any, train_split: float = 0.8
+) -> tuple[DataLoader, DataLoader, tuple[str, ...], torch.Tensor]:
+
+    train_dataset, class_names = build_module_dataset(
+        module,
+        bundle.raw_config,
+        transform=build_train_transforms(bundle.config.dataset.image_size),
     )
 
-    # Calculate class weights
-    labels = [label for _, label in encoded_samples]
+    val_dataset, _ = build_module_dataset(
+        module,
+        bundle.raw_config,
+        transform=build_eval_transforms(bundle.config.dataset.image_size),
+    )
 
+    labels = [label for _, label in train_dataset.samples]
     counts = Counter(labels)
 
     num_samples = len(labels)
@@ -340,24 +407,6 @@ def build_training_loaders(module: str, bundle: Any, train_split: float = 0.8) -
         seed=bundle.config.seed,
     )
 
-    print(f"Train samples: {len(train_indices)}")
-    print(f"Validation samples: {len(val_indices)}")
-    print(f"Overlap: {len(set(train_indices) & set(val_indices))}")
-
-    train_dataset = ImageSampleDataset(
-        encoded_samples,
-        transform=build_train_transforms(
-            bundle.config.dataset.image_size
-        ),
-    )
-
-    val_dataset = ImageSampleDataset(
-        encoded_samples,
-        transform=build_eval_transforms(
-            bundle.config.dataset.image_size
-        ),
-    )
-
     train_loader = create_dataloader(
         dataset=Subset(train_dataset, train_indices),
         batch_size=bundle.config.dataset.batch_size,
@@ -374,23 +423,15 @@ def build_training_loaders(module: str, bundle: Any, train_split: float = 0.8) -
         pin_memory=bundle.config.dataset.pin_memory,
     )
 
-    # DEBUG ONLY
-    # =============================================
-    print("Class names:", class_names)
-    print("Class weights:", class_weights)
-    # =============================================
-
     return train_loader, val_loader, class_names, class_weights
 
-def build_evaluation_loader(module: str, bundle: Any) -> tuple[DataLoader, tuple[str, ...]]:
-    raw_samples = collect_raw_samples(module, bundle.raw_config)
-    encoded_samples, class_names = encode_samples(
-        raw_samples,
-        _get_dataset_config(bundle.raw_config),
-    )
 
-    dataset = ImageSampleDataset(
-        encoded_samples,
+def build_evaluation_loader(
+    module: str, bundle: Any
+) -> tuple[DataLoader, tuple[str, ...]]:
+    dataset, class_names = build_module_dataset(
+        module,
+        bundle.raw_config,
         transform=build_eval_transforms(bundle.config.dataset.image_size),
     )
 
@@ -405,9 +446,10 @@ def build_evaluation_loader(module: str, bundle: Any) -> tuple[DataLoader, tuple
     return loader, class_names
 
 
-def build_evaluation_loaders(module: str, bundle: Any) -> tuple[DataLoader, tuple[str, ...]]:
+def build_evaluation_loaders(
+    module: str, bundle: Any
+) -> tuple[DataLoader, tuple[str, ...]]:
     """Compatibility wrapper for callers that use the pluralized helper name."""
-
     return build_evaluation_loader(module, bundle)
 
 
@@ -420,11 +462,21 @@ def build_model_from_config(config: ExperimentConfig) -> nn.Module:
     )
 
 
-def build_trainer(bundle: ExperimentBundle, model: nn.Module, class_names: Sequence[str], class_weights: torch.Tensor | None = None,
-) -> tuple[Trainer, torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler | torch.optim.lr_scheduler.ReduceLROnPlateau | None]:
+def build_trainer(
+    bundle: ExperimentBundle,
+    model: nn.Module,
+    class_names: Sequence[str],
+    class_weights: torch.Tensor | None = None,
+) -> tuple[
+    Trainer,
+    torch.optim.Optimizer,
+    torch.optim.lr_scheduler.LRScheduler
+    | torch.optim.lr_scheduler.ReduceLROnPlateau
+    | None,
+]:
     if class_weights is not None:
         class_weights = class_weights.to(bundle.device)
-    
+
     loss_fn = build_loss(bundle.config.loss, class_weights=class_weights)
     optimizer = build_optimizer(model, bundle.config.optimizer)
     scheduler = build_scheduler(optimizer, bundle.config.scheduler)
@@ -455,7 +507,9 @@ def build_trainer(bundle: ExperimentBundle, model: nn.Module, class_names: Seque
     return trainer, optimizer, scheduler
 
 
-def evaluate_model(bundle: Any, model: nn.Module, dataloader: DataLoader) -> EvaluationResult:
+def evaluate_model(
+    bundle: Any, model: nn.Module, dataloader: DataLoader
+) -> EvaluationResult:
     evaluator = Evaluator(
         model=model,
         loss_fn=build_loss(bundle.config.loss),
@@ -465,35 +519,35 @@ def evaluate_model(bundle: Any, model: nn.Module, dataloader: DataLoader) -> Eva
     return evaluator.evaluate(dataloader)
 
 
-def serialize_evaluation_result(result: EvaluationResult, class_names: Sequence[str]) -> dict[str, Any]:
-    return {
-        "loss": result.loss,
-        "metrics": {
-            "accuracy": result.metrics.accuracy,
-            "precision": result.metrics.precision,
-            "recall": result.metrics.recall,
-            "f1": result.metrics.f1,
-            "roc_auc": result.metrics.roc_auc,
-        },
-        "class_names": list(class_names),
-        "confusion_matrix": result.confusion_matrix.tolist(),
-        "predictions": result.predictions.tolist(),
-        "targets": result.targets.tolist(),
-    }
+def serialize_evaluation_result(
+    result: EvaluationResult, class_names: Sequence[str]
+) -> dict[str, Any]:
+    serialized = serialize_eval_result(result)
+    serialized["class_names"] = list(class_names)
+    return serialized
 
 
-def save_evaluation_result(result: EvaluationResult, output_dir: Path, class_names: Sequence[str]) -> None:
+def save_evaluation_result(
+    result: EvaluationResult, output_dir: Path, class_names: Sequence[str]
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     save_json(
         serialize_evaluation_result(result, class_names),
         output_dir / "metrics.json",
     )
 
-    with (output_dir / "confusion_matrix.csv").open("w", newline="", encoding="utf-8") as handle:
+    with (output_dir / "confusion_matrix.csv").open(
+        "w", newline="", encoding="utf-8"
+    ) as handle:
         writer = csv.writer(handle)
         writer.writerow(["class"] + list(class_names))
         for index, row in enumerate(result.confusion_matrix.tolist()):
-            writer.writerow([class_names[index] if index < len(class_names) else index, *row])
+            writer.writerow(
+                [
+                    class_names[index] if index < len(class_names) else index,
+                    *row,
+                ]
+            )
 
 
 def resolve_named_module(root: nn.Module, path: str) -> nn.Module:
@@ -512,7 +566,9 @@ def resolve_named_module(root: nn.Module, path: str) -> nn.Module:
     return module
 
 
-def resolve_gradcam_target_layer(model: nn.Module, target_layer: str | None = None) -> nn.Module:
+def resolve_gradcam_target_layer(
+    model: nn.Module, target_layer: str | None = None
+) -> nn.Module:
     if target_layer:
         return resolve_named_module(model, target_layer)
 
@@ -542,11 +598,17 @@ def preprocess_pil_image(image: Image.Image, image_size: int) -> Tensor:
 
 
 def load_image_tensor(image_path: Path, image_size: int) -> Tensor:
-    with Image.open(image_path) as image:
-        return preprocess_pil_image(image, image_size)
+    config = InferencePreprocessingConfig(
+        image_size=(image_size, image_size),
+        mean=IMAGENET_MEAN,
+        std=IMAGENET_STD,
+    )
+    return preprocess_inference_image(image_path, config)
 
 
-def predict_image(model: nn.Module, image: Path | Image.Image, image_size: int) -> tuple[Any, Tensor]:
+def predict_image(
+    model: nn.Module, image: Path | Image.Image, image_size: int
+) -> tuple[Any, Tensor]:
     predictor = Predictor(model)
 
     if isinstance(image, Path):
@@ -585,7 +647,11 @@ def generate_gradcam_overlay(
     return result, overlay
 
 
-def load_experiment_bundle(experiment_root: Path, checkpoint_name: str = "best.pt", device_name: str = "auto") -> LoadedExperiment:
+def load_experiment_bundle(
+    experiment_root: Path,
+    checkpoint_name: str = "best.pt",
+    device_name: str = "auto",
+) -> LoadedExperiment:
     raw_config = load_yaml(experiment_root / "config.yaml")
     if not isinstance(raw_config, dict):
         raise TypeError("Experiment config must be a mapping.")
@@ -594,6 +660,8 @@ def load_experiment_bundle(experiment_root: Path, checkpoint_name: str = "best.p
     device = resolve_device(device_name if device_name else config.device)
 
     model = build_model_from_config(config)
+    module = str(raw_config["module"]["name"])
+    model_name = str(raw_config["model"]["name"])
 
     checkpoint_path = experiment_root / "checkpoints" / checkpoint_name
 
@@ -603,9 +671,7 @@ def load_experiment_bundle(experiment_root: Path, checkpoint_name: str = "best.p
     if not checkpoint_path.exists():
         raise FileNotFoundError(checkpoint_path)
 
-    load_checkpoint(checkpoint_path, model)
-    model.to(device)
-    model.eval()
+    prepare_model(checkpoint_path=checkpoint_path, model=model, device=device)
 
     class_names = tuple(
         str(name) for name in raw_config.get("dataset", {}).get("class_names", [])
@@ -613,6 +679,8 @@ def load_experiment_bundle(experiment_root: Path, checkpoint_name: str = "best.p
 
     return LoadedExperiment(
         root=experiment_root,
+        module=module,
+        model_name=model_name,
         raw_config=raw_config,
         config=config,
         model=model,
@@ -622,7 +690,9 @@ def load_experiment_bundle(experiment_root: Path, checkpoint_name: str = "best.p
     )
 
 
-def save_prediction_results(output_path: Path, predictions: Sequence[dict[str, Any]]) -> None:
+def save_prediction_results(
+    output_path: Path, predictions: Sequence[dict[str, Any]]
+) -> None:
     save_json({"predictions": list(predictions)}, output_path)
 
 

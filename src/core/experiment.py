@@ -56,6 +56,7 @@ class ExperimentPaths:
 
     config_file: Path
     log_file: Path
+    metrics_file: Path
 
 def deep_merge(base: ConfigDict, update: Mapping[str, ConfigValue]) -> ConfigDict:
     """
@@ -371,6 +372,7 @@ def create_experiment_paths(save_dir: Path, module: str, model: str, experiment_
         evaluation=evaluation,
         config_file=root / "config.yaml",
         log_file=root / "train.log",
+        metrics_file=root / "metrics.json",
     )
 
 class Experiment:
