@@ -1,0 +1,3 @@
+model:
+ name: swin_transformer
+ pretrained: true
