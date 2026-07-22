@@ -39,3 +39,13 @@ def accuracy(logits: Tensor, labels: Tensor) -> float:
     return float(
         correct.item() / labels.size(0)
     )
+
+def accuracy_counts(logits: Tensor, labels: Tensor) -> tuple[int, int]:
+    """
+    Return (correct_predictions, total_samples).
+    """
+
+    predictions = torch.argmax(logits, dim=1)
+    correct = torch.eq(predictions, labels).sum().item()
+
+    return int(correct), labels.size(0)

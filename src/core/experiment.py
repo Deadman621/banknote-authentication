@@ -318,7 +318,7 @@ def parse_config(cfg: Mapping[str, object]) -> ExperimentConfig:
         ),
     )
 
-def create_experiment_paths(save_dir: Path, module: str, model: str, experiment_name: str) -> ExperimentPaths:
+def create_experiment_paths(save_dir: Path, module: str, model: str, experiment_name: str, root: Path | None = None) -> ExperimentPaths:
     """
     Create the directory structure for a training experiment.
 
@@ -338,15 +338,16 @@ def create_experiment_paths(save_dir: Path, module: str, model: str, experiment_
                         metrics.json
     """
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if root is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    root = (
-        save_dir
-        / module
-        / model
-        / experiment_name
-        / timestamp
-    )
+        root = (
+            save_dir
+            / module
+            / model
+            / experiment_name
+            / timestamp
+        )
 
     evaluation = root / "evaluation"
     checkpoints = root / "checkpoints"
@@ -376,19 +377,97 @@ def create_experiment_paths(save_dir: Path, module: str, model: str, experiment_
     )
 
 class Experiment:
-    def __init__(self, module: str, model: str) -> None:
-        raw_config = load_config_dict(
-            module=module,
-            model=model,
+    def __init__(
+        self,
+        module: str | None = None,
+        model: str | None = None,
+        experiment_name: str | None = None,
+        existing_run: Path | None = None,
+    ):
+        if existing_run is not None:
+            raw_config = load_yaml(
+                existing_run / "config.yaml"
+            )
+
+            if not isinstance(raw_config, dict):
+                raise TypeError(
+                    "Experiment config must be a mapping."
+                )
+
+        else:
+            if module is None or model is None:
+                raise ValueError(
+                    "module and model are required for a new experiment."
+                )
+
+            raw_config = load_config_dict(
+                module=module,
+                model=model,
+            )
+
+            if experiment_name is not None:
+                experiment_cfg_raw = raw_config.get(
+                    "experiment"
+                )
+
+                if experiment_cfg_raw is None:
+                    experiment_cfg: ConfigDict = {}
+
+                elif isinstance(experiment_cfg_raw, dict):
+                    experiment_cfg = cast(ConfigDict, experiment_cfg_raw)
+
+                else:
+                    raise TypeError(
+                        "'experiment' config must be a mapping."
+                    )
+
+                experiment_cfg["name"] = experiment_name
+                raw_config["experiment"] = experiment_cfg
+
+        self.raw_config = raw_config
+        self.config = parse_config(raw_config)
+
+        module_cfg = require_mapping(
+            raw_config,
+            "module",
         )
 
-        self.config = parse_config(raw_config)
+        model_cfg = require_mapping(
+            raw_config,
+            "model",
+        )
+
+        self.module = require(
+            module_cfg,
+            "name",
+            str,
+        )
+
+        self.model = require(
+            model_cfg,
+            "name",
+            str,
+        )
 
         self.paths = create_experiment_paths(
             save_dir=self.config.output.save_dir,
-            module=module,
-            model=model,
+            module=self.module,
+            model=self.model,
             experiment_name=self.config.experiment.name,
+            root=existing_run,
         )
 
-        save_yaml(raw_config, self.paths.config_file)
+        if existing_run is None:
+            save_yaml(
+                raw_config,
+                self.paths.config_file,
+            )
+
+    @property
+    def last_checkpoint(self) -> Path:
+        return self.paths.checkpoints / "last.pt"
+
+
+    @property
+    def best_checkpoint(self) -> Path:
+        return self.paths.checkpoints / "best.pt"

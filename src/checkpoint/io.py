@@ -31,7 +31,7 @@ def save_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer, epoch: i
     torch.save(checkpoint, path)
 
 
-def load_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer | None = None, scheduler: SchedulerProtocol | None = None) -> CheckpointState:
+def load_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer | None = None, scheduler: SchedulerProtocol | None = None, *, load_optimizer: bool = True, load_scheduler: bool = True) -> CheckpointState:
     """
     Load training checkpoint.
     """
@@ -39,8 +39,11 @@ def load_checkpoint(path: Path, model: nn.Module, optimizer: Optimizer | None = 
     checkpoint = torch.load(path, map_location="cpu")
     model.load_state_dict(checkpoint["model_state_dict"])
 
-    if optimizer is not None:
+    if load_optimizer and optimizer is not None:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+    if (load_scheduler and scheduler is not None and "scheduler_state_dict" in checkpoint):
+        scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
 
     if (scheduler is not None and "scheduler_state_dict" in checkpoint):
         scheduler.load_state_dict(checkpoint["scheduler_state_dict"])

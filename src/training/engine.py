@@ -54,26 +54,27 @@ class TrainingEngine:
 
         self.model.to(self.device)
 
-    def train_step(self, images: Tensor, labels: Tensor) -> tuple[float, float]:
+    def train_step(self, images: Tensor, labels: Tensor) -> tuple[float, int, int]:
         """
         Execute a single training batch.
 
         Returns
         -------
-        tuple[float, float]
-            loss and accuracy
+        tuple[float, int, int]
+            loss, number of correct predictions, batch size
         """
 
         self.model.train()
 
         images, labels = move_batch_to_device(images, labels, self.device)
+
         self.amp.zero_grad(self.optimizer)
 
         with self.amp.autocast():
             logits = self.model(images)
             loss = self.loss_fn(logits, labels)
 
-        self.amp.backward( loss, self.optimizer)
+        self.amp.backward(loss, self.optimizer)
 
         if self.gradient_clip is not None:
             self.amp.unscale_(self.optimizer)
@@ -83,10 +84,17 @@ class TrainingEngine:
             )
 
         self.amp.step(self.optimizer)
-        batch_accuracy = accuracy(logits.detach(), labels)
 
-        return (float(loss.item()), batch_accuracy)
-    
+        predictions = torch.argmax(logits.detach(), dim=1)
+        correct = torch.eq(predictions, labels).sum().item()
+        batch_size = labels.size(0)
+
+        return (
+            float(loss.item()),
+            int(correct),
+            batch_size,
+        )
+        
     def train_epoch(self, loader: DataLoader) -> None:
         """
         Train for one epoch.
@@ -95,8 +103,8 @@ class TrainingEngine:
         self.state.total_batches = len(loader)
 
         total_loss = 0.0
-        total_accuracy = 0.0
-        batches = 0
+        total_correct = 0
+        total_samples = 0
 
         for callback in self.callbacks:
             callback.on_epoch_begin(self.state)
@@ -105,15 +113,16 @@ class TrainingEngine:
             for callback in self.callbacks:
                 callback.on_batch_begin(self.state)
 
-            loss, batch_accuracy = self.train_step(images, labels)
+            loss, correct, batch_size = self.train_step(images, labels)
 
-            total_loss += loss
-            total_accuracy += batch_accuracy
-            batches += 1
+            total_loss += loss * batch_size
+            total_correct += correct
+            total_samples += batch_size
 
             self.state.global_step += 1
-            self.state.train_loss = (total_loss / batches)
-            self.state.train_accuracy = (total_accuracy / batches)
+
+            self.state.train_loss = total_loss / total_samples
+            self.state.train_accuracy = total_correct / total_samples
 
             for callback in self.callbacks:
                 callback.on_batch_end(self.state)

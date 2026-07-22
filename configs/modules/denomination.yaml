@@ -1,9 +1,9 @@
 module:
   name: denomination
 dataset:
-  root: data/raw/denomination/archive/dataset
-  image_size: 256
-  num_classes: 8
+  root: data/raw/denomination/Bangladeshi_Paper_Currency_Raw
+  image_size: 224
+  num_classes: 9
   class_names:
     - 2
     - 5
@@ -15,5 +15,5 @@ dataset:
     - 1000
 preprocessing:
   aligned_output:
-    width: 256
-    height: 117
+    width: 224
+    height: 224

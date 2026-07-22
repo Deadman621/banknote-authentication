@@ -25,14 +25,9 @@ from src.augmentation.transforms import (
     build_eval_transforms,
     build_train_transforms,
 )
-from src.checkpoint.io import load_checkpoint, save_checkpoint
+
 from src.core.config import ExperimentConfig
-from src.core.experiment import (
-    create_experiment_paths,
-    load_config_dict,
-    load_preprocessing_configs,
-    parse_config,
-)
+from src.core.experiment import Experiment, parse_config
 from src.datasets.dataloader import create_dataloader
 from src.datasets.dataset import CurrencyDataset
 from src.evaluation.evaluator import Evaluator
@@ -57,7 +52,7 @@ from src.training.losses import build_loss
 from src.training.optimizer import build_optimizer
 from src.training.scheduler import build_scheduler
 from src.training.trainer import Trainer
-from src.utils.io import load_yaml, save_json, save_yaml
+from src.utils.io import load_yaml, save_json
 from src.utils.logger import get_logger
 from src.utils.seed import seed_everything
 
@@ -134,52 +129,43 @@ def resolve_device(device_name: str) -> torch.device:
 
     return torch.device(device_name)
 
+def prepare_experiment(
+    module: str | None,
+    model: str | None,
+    experiment_name: str | None = None,
+    existing_run: Path | None = None,
+) -> ExperimentBundle:
 
-def load_raw_config(module: str, model: str) -> dict[str, Any]:
-    raw_config = load_config_dict(module, model)
-
-    if not isinstance(raw_config, dict):
-        raise TypeError("Loaded configuration must be a mapping.")
-
-    return deepcopy(raw_config)
-
-
-def prepare_experiment(module: str, model: str, experiment_name: str | None = None) -> ExperimentBundle:
-    raw_config = load_raw_config(module, model)
-
-    if experiment_name is not None:
-        raw_config.setdefault("experiment", {})["name"] = experiment_name
-
-    config = parse_config(raw_config)
-
-    paths = create_experiment_paths(
-        save_dir=config.output.save_dir,
+    experiment = Experiment(
         module=module,
         model=model,
-        experiment_name=config.experiment.name,
+        experiment_name=experiment_name,
+        existing_run=existing_run,
     )
 
-    save_yaml(raw_config, paths.config_file)
+    device = resolve_device(experiment.config.device)
 
-    device = resolve_device(config.device)
     logger = get_logger(
-        name=f"banknote.{module}.{model}",
-        log_file=paths.log_file,
-        level=getattr(logging, config.logging.level.upper(), logging.INFO),
+        name=f"banknote.{experiment.module}.{experiment.model}",
+        log_file=experiment.paths.log_file,
+        level=getattr(
+            logging,
+            experiment.config.logging.level.upper(),
+            logging.INFO,
+        ),
     )
 
-    seed_everything(config.seed)
+    seed_everything(experiment.config.seed)
 
     return ExperimentBundle(
-        module=module,
-        model_name=model,
-        raw_config=raw_config,
-        config=config,
-        paths=paths,
+        module=experiment.module,
+        model_name=experiment.model,
+        raw_config=experiment.raw_config,
+        config=experiment.config,
+        paths=experiment.paths,
         device=device,
         logger=logger,
     )
-
 
 def _require_mapping(value: object, key: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):

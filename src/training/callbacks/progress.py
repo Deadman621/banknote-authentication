@@ -52,5 +52,4 @@ class ProgressCallback(Callback):
             return
 
         self.progress_bar.close()
-        print(end='\n')
         self.progress_bar = None

@@ -13,42 +13,85 @@ from scripts._common import (
     save_evaluation_result,
 )
 
-from src.checkpoint.io import save_checkpoint, load_checkpoint
+from src.checkpoint.io import load_checkpoint
 from src.training.state import TrainState
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train a banknote model.")
-    parser.add_argument("--module", required=True, help="Module name, e.g. denomination.")
-    parser.add_argument("--model", required=True, help="Model name, e.g. cnn.")
+    parser = argparse.ArgumentParser(
+        description="Train a banknote model."
+    )
+
+    parser.add_argument(
+        "--module",
+        default=None,
+        help="Module name for a new experiment.",
+    )
+
+    parser.add_argument(
+        "--model",
+        default=None,
+        help="Model name for a new experiment.",
+    )
+
     parser.add_argument(
         "--experiment-name",
         default=None,
         help="Override the experiment name from config.",
     )
+
     parser.add_argument(
         "--train-split",
         type=float,
         default=0.8,
         help="Fraction of samples used for training.",
     )
-    parser.add_argument(
+
+    group = parser.add_mutually_exclusive_group()
+
+    group.add_argument(
         "--resume",
         type=Path,
         default=None,
-        help="Resume training from a checkpoint.",
+        help="Resume an existing training run.",
     )
-    return parser.parse_args()
 
+    group.add_argument(
+        "--checkpoint",
+        type=Path,
+        default=None,
+        help="Initialize a new training run from an existing checkpoint.",
+    )
+
+    args = parser.parse_args()
+
+    # Validation rules
+    if args.resume is None:
+        if args.module is None or args.model is None:
+            parser.error(
+                "--module and --model are required "
+                "unless --resume is provided."
+            )
+
+    if args.resume is not None and args.experiment_name is not None:
+        parser.error(
+            "--experiment-name cannot be used with --resume."
+        )
+
+    return args
 
 def main() -> None:
     args = parse_args()
-    bundle = prepare_experiment(args.module, args.model, args.experiment_name)
+    bundle = prepare_experiment(
+        module=args.module,
+        model=args.model,
+        experiment_name=args.experiment_name,
+        existing_run=args.resume,
+    )
 
     train_loader, val_loader, class_names, class_weights = build_training_loaders(
-        args.module,
+        bundle.module,
         bundle,
-        train_split=args.train_split,
     )
 
     model = build_model_from_config(bundle.config)
@@ -57,10 +100,12 @@ def main() -> None:
 
     if args.resume is not None:
         checkpoint = load_checkpoint(
-            path=args.resume,
+            path=bundle.paths.checkpoints / "last.pt",
             model=model,
             optimizer=optimizer,
             scheduler=scheduler,
+            load_optimizer=True,
+            load_scheduler=True,
         )
 
         trainer.restore_checkpoint(checkpoint)
@@ -77,10 +122,25 @@ def main() -> None:
             checkpoint.global_step,
         )
 
+    elif args.checkpoint is not None:
+        checkpoint = load_checkpoint(
+            path=args.checkpoint,
+            model=model,
+            optimizer=None,
+            scheduler=None,
+            load_optimizer=False,
+            load_scheduler=False,
+        )
+
+        bundle.logger.info(
+            "Initialized model from checkpoint %s",
+            args.checkpoint,
+        )
+
     bundle.logger.info(
         "Starting training for module=%s model=%s on %s",
-        args.module,
-        args.model,
+        bundle.module,
+        bundle.model_name,
         bundle.device,
     )
 

@@ -9,9 +9,79 @@ from pathlib import Path
 from PIL import Image
 from torch import Tensor
 
-
-
 class DenominationDataset(CurrencyDataset):
+    """
+    Dataset for denomination classification.
+
+    Expected directory structure:
+
+    root/
+    ├── 2/
+    ├── 5/
+    ├── 10/
+    ├── 20/
+    ├── 50/
+    ├── 100/
+    ├── 200/
+    ├── 500/
+    └── 1000/
+    """
+
+    def __init__(self,root: str | Path,transform: Callable[[Image.Image], Tensor] | None = None) -> None:
+        self.class_to_index: dict[str, int] = {}
+        self.index_to_class: dict[int, str] = {}
+
+        super().__init__(
+            root=root,
+            transform=transform,
+        )
+
+        self.num_classes = len(self.class_to_index)
+
+    def build_samples(self) -> list[tuple[Path, int]]:
+        """
+        Discover images from denomination folders and create integer labels.
+        """
+
+        if not self.root.exists():
+            return []
+
+        class_dirs = sorted(
+            [d for d in self.root.iterdir() if d.is_dir()],
+            key=lambda d: int(d.name),
+        )
+
+        self.class_to_index = {
+            class_dir.name: idx
+            for idx, class_dir in enumerate(class_dirs)
+        }
+
+        self.index_to_class = {
+            idx: class_name
+            for class_name, idx in self.class_to_index.items()
+        }
+
+        samples: list[tuple[Path, int]] = []
+
+        for class_dir in class_dirs:
+            label = self.class_to_index[class_dir.name]
+
+            for image_path in sorted(class_dir.iterdir()):
+                if self.is_supported_image(image_path):
+                    samples.append((image_path, label))
+
+        return samples
+
+    @property
+    def classes(self) -> list[str]:
+        """Return denomination names ordered by class index."""
+
+        return [
+            self.index_to_class[idx]
+            for idx in range(len(self.index_to_class))
+        ]
+
+class DenominationDataset_OLD(CurrencyDataset):
     """
     Dataset for denomination classification.
 
