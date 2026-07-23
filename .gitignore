@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+tests/test_report.txt
+
 # Dataset
 data/raw/*
 data/processed/*
