@@ -27,7 +27,7 @@ class DenominationDataset(CurrencyDataset):
     └── 1000/
     """
 
-    def __init__(self,root: str | Path,transform: Callable[[Image.Image], Tensor] | None = None) -> None:
+    def __init__(self,root: str | Path, transform: Callable[[Image.Image], Tensor] | None = None) -> None:
         self.class_to_index: dict[str, int] = {}
         self.index_to_class: dict[int, str] = {}
 
@@ -73,14 +73,12 @@ class DenominationDataset(CurrencyDataset):
         return samples
 
     @property
-    def classes(self) -> list[str]:
-        """Return denomination names ordered by class index."""
-
-        return [
+    def class_names(self) -> tuple[str, ...]:
+        return tuple(
             self.index_to_class[idx]
             for idx in range(len(self.index_to_class))
-        ]
-
+        )
+    
 class DenominationDataset_OLD(CurrencyDataset):
     """
     Dataset for denomination classification.
@@ -166,3 +164,5 @@ class DenominationDataset_OLD(CurrencyDataset):
             self.index_to_class[index]
             for index in sorted(self.index_to_class)
         ]
+
+Dataset = DenominationDataset

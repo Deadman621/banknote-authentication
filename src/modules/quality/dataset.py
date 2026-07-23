@@ -2,7 +2,7 @@
 Dataset implementation for currency-image quality classification.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from pathlib import Path
 
 from PIL import Image
@@ -13,48 +13,51 @@ from src.datasets.dataset import CurrencyDataset
 
 class QualityDataset(CurrencyDataset):
     """
-    Dataset for currency-image quality classification.
+    Dataset for quality classification.
 
-    Samples are supplied explicitly as image-path and integer-label pairs.
+    Expected directory structure:
+
+    root/
+    ├── class_1/
+    ├── class_2/
+    └── ...
     """
 
     def __init__(
         self,
         root: str | Path,
-        samples: Sequence[tuple[str | Path, int]],
         transform: Callable[[Image.Image], Tensor] | None = None,
     ) -> None:
-        self._provided_samples = [
-            (Path(image_path), int(label))
-            for image_path, label in samples
-        ]
+        self._class_to_index: dict[str, int] = {}
 
-        super().__init__(
-            root=root,
-            transform=transform,
-        )
+        super().__init__(root=root, transform=transform)
 
     def build_samples(self) -> list[tuple[Path, int]]:
-        """
-        Validate and return quality-classification samples.
-        """
+        class_dirs = sorted(
+            directory
+            for directory in self.root.iterdir()
+            if directory.is_dir()
+        )
 
-        validated_samples: list[tuple[Path, int]] = []
+        self._class_to_index = {
+            directory.name: index
+            for index, directory in enumerate(class_dirs)
+        }
 
-        for image_path, label in self._provided_samples:
-            full_path = (
-                image_path
-                if image_path.is_absolute()
-                else self.root / image_path
-            )
+        samples: list[tuple[Path, int]] = []
 
-            if not self.is_supported_image(full_path):
-                raise ValueError(
-                    f"Invalid quality image: {full_path}"
-                )
+        for class_dir in class_dirs:
+            label = self._class_to_index[class_dir.name]
 
-            validated_samples.append(
-                (full_path, int(label))
-            )
+            for image_path in sorted(class_dir.iterdir()):
+                if self.is_supported_image(image_path):
+                    samples.append((image_path, label))
 
-        return validated_samples
+        return samples
+
+    @property
+    def class_names(self) -> tuple[str, ...]:
+        return tuple(self._class_to_index.keys())
+
+
+Dataset = QualityDataset
