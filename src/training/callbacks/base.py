@@ -38,5 +38,5 @@ class Callback:
     def on_validation_end(self, state: TrainState) -> None:
         pass
 
-    def restore_checkpoint(self, checkpoint: CheckpointState) -> None:
+    def restore_checkpoint(self, checkpoint: TrainState) -> None:
         pass

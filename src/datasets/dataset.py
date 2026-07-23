@@ -21,13 +21,6 @@ SUPPORTED_IMAGE_EXTENSIONS = {
 
 
 class CurrencyDataset(Dataset[tuple[Tensor, int]], ABC):
-    """
-    Generic base dataset for currency-image classification.
-
-    Child datasets define how image paths and integer labels are discovered
-    by implementing build_samples().
-    """
-
     def __init__(self, root: str | Path, transform: Callable[[Image.Image], Tensor] | None = None) -> None:
         self.root = Path(root)
         self.transform = transform
@@ -106,3 +99,16 @@ class CurrencyDataset(Dataset[tuple[Tensor, int]], ABC):
             path.is_file()
             and path.suffix.lower() in SUPPORTED_IMAGE_EXTENSIONS
         )
+    
+    @property
+    def class_names(self) -> tuple[str, ...]:
+        """
+        Return ordered class names.
+
+        Child datasets should override this.
+        """
+        labels = sorted(
+            {label for _, label in self.samples}
+        )
+
+        return tuple(str(label) for label in labels)

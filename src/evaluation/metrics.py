@@ -62,7 +62,7 @@ def precision(predictions: Tensor, targets: Tensor) -> float:
             targets.cpu().numpy(),
             predictions.cpu().numpy(),
             average="macro",
-            zero_division=0,
+            zero_division=0, # pyright: ignore[reportArgumentType]
         )
     )
 
@@ -77,7 +77,7 @@ def recall(predictions: Tensor, targets: Tensor) -> float:
             targets.cpu().numpy(),
             predictions.cpu().numpy(),
             average="macro",
-            zero_division=0,
+            zero_division=0, # pyright: ignore[reportArgumentType]
         )
     )
 
@@ -92,7 +92,7 @@ def f1(predictions: Tensor, targets: Tensor) -> float:
             targets.cpu().numpy(),
             predictions.cpu().numpy(),
             average="macro",
-            zero_division=0,
+            zero_division=0, # pyright: ignore[reportArgumentType]
         )
     )
 

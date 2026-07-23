@@ -9,7 +9,7 @@ from torch import nn
 from torch.optim import Optimizer
 
 from src.core.config import CheckpointConfig
-from src.checkpoint.state import CheckpointState
+from src.training.state import TrainState
 from src.training.callbacks.base import Callback
 from src.checkpoint.io import (
     SchedulerProtocol,
@@ -76,7 +76,7 @@ class CheckpointCallback(Callback):
                 best_metric=self.best_metric,
             )
 
-    def restore_checkpoint(self, checkpoint: CheckpointState) -> None:
+    def restore_checkpoint(self, checkpoint: TrainState) -> None:
         self.best_metric = checkpoint.best_metric
 
     def _get_metric(self, state: TrainState) -> float:
