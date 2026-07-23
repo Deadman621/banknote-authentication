@@ -325,7 +325,7 @@ def build_module_dataset(module: str, raw_config: Mapping[str, Any], transform: 
         if root.exists() and root.is_dir():
             try:
                 ds = DenominationDataset(root=root, transform=transform)
-                return ds, tuple(ds.classes)
+                return ds, tuple(ds.class_names)
             except Exception:
                 pass
 
@@ -333,9 +333,9 @@ def build_module_dataset(module: str, raw_config: Mapping[str, Any], transform: 
     encoded_samples, class_names = encode_samples(raw_samples, dataset_config)
 
     if module == "authenticity":
-        ds = AuthenticityDataset(root=root, samples=encoded_samples, transform=transform)
+        ds = AuthenticityDataset(root=root, transform=transform)
     elif module == "quality":
-        ds = QualityDataset(root=root, samples=encoded_samples, transform=transform)
+        ds = QualityDataset(root=root, transform=transform)
     else:
         ds = ImageSampleDataset(root=root, samples=encoded_samples, transform=transform)
 

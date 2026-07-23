@@ -1,67 +1,107 @@
+# scripts/compare_experiments.py
+
 from __future__ import annotations
 
 import argparse
 import csv
+
 from pathlib import Path
 
-from scripts._common import build_evaluation_loaders, evaluate_model, load_experiment_bundle
+from src.application.experiment import ExperimentApplication
+from src.application.evaluation import EvaluationApplication
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Compare multiple trained experiments.")
+    parser = argparse.ArgumentParser(
+        description="Compare multiple trained experiments."
+    )
+
     parser.add_argument(
         "--experiment-roots",
         nargs="+",
         required=True,
-        help="One or more experiment root directories.",
+        type=Path,
+        help="Experiment directories to compare.",
     )
+
     parser.add_argument(
         "--checkpoint-name",
         default="best.pt",
-        help="Checkpoint filename inside each experiment checkpoint directory.",
+        help="Checkpoint filename.",
     )
+
     parser.add_argument(
         "--output",
-        default="comparison.csv",
-        help="Path to the CSV summary output.",
+        type=Path,
+        default=Path("comparison.csv"),
+        help="CSV output path.",
     )
+
     return parser.parse_args()
 
 
 def main() -> None:
+
     args = parse_args()
+
+    experiment_app = ExperimentApplication()
+    evaluation_app = EvaluationApplication()
+
     rows: list[dict[str, object]] = []
 
-    for root_name in args.experiment_roots:
-        bundle = load_experiment_bundle(Path(root_name), args.checkpoint_name)
-        dataloader, class_names = build_evaluation_loaders(bundle.config.experiment.name, bundle)
-        evaluation = evaluate_model(bundle, bundle.model, dataloader)
+
+    for experiment_root in args.experiment_roots:
+
+        context = experiment_app.prepare(
+            existing_run=experiment_root,
+        )
+
+        result = evaluation_app.evaluate(
+            context=context,
+            checkpoint_name=args.checkpoint_name,
+        )
 
         rows.append(
             {
-                "experiment_root": root_name,
-                "model": bundle.config.model.name,
-                "module": bundle.config.experiment.name,
-                "accuracy": evaluation.metrics.accuracy,
-                "precision": evaluation.metrics.precision,
-                "recall": evaluation.metrics.recall,
-                "f1": evaluation.metrics.f1,
-                "roc_auc": evaluation.metrics.roc_auc,
-                "loss": evaluation.loss,
+                "experiment_root": str(experiment_root),
+                "module": context.module,
+                "model": context.config.model.name,
+                "accuracy": result.metrics.accuracy,
+                "precision": result.metrics.precision,
+                "recall": result.metrics.recall,
+                "f1": result.metrics.f1,
+                "roc_auc": result.metrics.roc_auc,
+                "loss": result.loss,
             }
         )
 
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with output_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
+    args.output.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+
+    with args.output.open(
+        "w",
+        newline="",
+        encoding="utf-8",
+    ) as file:
+
+        writer = csv.DictWriter(
+            file,
+            fieldnames=list(rows[0].keys()),
+        )
+
         writer.writeheader()
         writer.writerows(rows)
 
+
     for row in rows:
         print(
-            f"{row['experiment_root']}: accuracy={row['accuracy']:.4f} f1={row['f1']:.4f}"
+            f"{row['experiment_root']}: "
+            f"accuracy={row['accuracy']:.4f} "
+            f"f1={row['f1']:.4f}"
         )
 
 

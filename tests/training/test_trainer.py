@@ -3,6 +3,8 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
+from pathlib import Path
+
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.core.config import (
@@ -37,7 +39,7 @@ def create_config() -> ExperimentConfig:
             name="test",
         ),
         dataset=DatasetConfig(
-            root=None,  # replace if Path required
+            root=Path("."),  # replace if Path required
             image_size=224,
             batch_size=4,
             num_workers=0,
@@ -82,7 +84,7 @@ def create_config() -> ExperimentConfig:
             level="INFO",
         ),
         output=OutputConfig(
-            save_dir=".",
+            save_dir=Path("."),
         ),
         preprocessing=PreprocessingConfig(
             gaussian_kernel=(5, 5),

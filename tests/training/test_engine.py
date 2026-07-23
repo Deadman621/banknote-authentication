@@ -46,7 +46,7 @@ def test_train_step_updates_model() -> None:
         .clone()
     )
 
-    loss, acc = engine.train_step(
+    loss, correct, batch_size = engine.train_step(
         images,
         labels,
     )
@@ -57,7 +57,7 @@ def test_train_step_updates_model() -> None:
     )
 
     assert loss > 0
-    assert 0.0 <= acc <= 1.0
+    assert 0 <= correct <= batch_size
 
     assert not torch.equal(
         before,

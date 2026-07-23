@@ -54,9 +54,9 @@ class Trainer:
             callbacks=callbacks,
         ) 
 
-    def restore_checkpoint(self, checkpoint: CheckpointState) -> None:
+    def restore_checkpoint(self, state: TrainState) -> None:
         for callback in self.engine.callbacks:
-            callback.restore_checkpoint(checkpoint)
+            callback.restore_checkpoint(state)
 
     def fit(self, train_loader: DataLoader, validation_loader: DataLoader, initial_state: Optional[TrainState] = None) -> TrainState:
         """

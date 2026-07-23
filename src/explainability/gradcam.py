@@ -99,6 +99,7 @@ class GradCAM:
 
         try:
             # ---- Forward ----
+            image = image.to(next(self._model.parameters()).device)
             image = image.unsqueeze(0)
 
             self._model.zero_grad(set_to_none=True)

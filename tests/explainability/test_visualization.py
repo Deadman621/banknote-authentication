@@ -4,6 +4,8 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 
+from typing import Any
+
 from src.explainability.visualization import (
     apply_colormap,
     overlay_heatmap,
@@ -52,7 +54,7 @@ def test_validate_image_valid(
     ],
 )
 def test_validate_image_invalid(
-    invalid_image: NDArray[np.generic],
+    invalid_image: Any,
 ) -> None:
     with pytest.raises(
         ValueError,
@@ -89,7 +91,7 @@ def test_validate_heatmap_valid(
     ],
 )
 def test_validate_heatmap_invalid(
-    invalid_heatmap: NDArray[np.generic],
+    invalid_heatmap: Any,
 ) -> None:
     with pytest.raises(
         ValueError,
