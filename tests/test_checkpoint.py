@@ -50,7 +50,7 @@ def test_save_and_load_checkpoint(
         create_components()
     )
 
-    state: CheckpointState = load_checkpoint(
+    state = load_checkpoint(
         checkpoint_path,
         new_model,
         new_optimizer,

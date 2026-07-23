@@ -4,6 +4,9 @@ import pytest
 import torch
 from PIL import Image
 
+from typing import cast
+from collections.abc import Sized
+
 from src.augmentation.transforms import (
     build_eval_transforms,
     build_train_transforms,
@@ -28,36 +31,14 @@ def create_test_image(path: Path) -> None:
 
 @pytest.fixture
 def denomination_directory(tmp_path: Path) -> Path:
-    filenames = [
-        "2 (1).png",
-        "2 (2).png",
-        "5 (1).png",
-        "5 (2).png",
-        "10 (1).png",
-        "10 (2).png",
-    ]
+    for denomination in ("2", "5", "10"):
+        class_dir = tmp_path / denomination
+        class_dir.mkdir()
 
-    for filename in filenames:
-        create_test_image(tmp_path / filename)
+        create_test_image(class_dir / "img1.png")
+        create_test_image(class_dir / "img2.png")
 
     return tmp_path
-
-
-def test_denomination_extraction() -> None:
-    assert (
-        DenominationDataset.extract_denomination("2 (1).png")
-        == "2"
-    )
-
-    assert (
-        DenominationDataset.extract_denomination("100 (25).jpg")
-        == "100"
-    )
-
-
-def test_invalid_denomination_filename() -> None:
-    with pytest.raises(ValueError):
-        DenominationDataset.extract_denomination("unknown.png")
 
 
 def test_dataset_getitem_returns_tensor_and_int(
@@ -83,7 +64,12 @@ def test_class_mapping_is_stable(
         transform=build_eval_transforms(),
     )
 
-    assert dataset.classes == ["2", "5", "10"]
+    assert dataset.class_names == (
+        "2",
+        "5",
+        "10",
+    )
+
     assert dataset.class_to_index == {
         "2": 0,
         "5": 1,
@@ -92,21 +78,41 @@ def test_class_mapping_is_stable(
 
 
 def test_train_transform_returns_tensor() -> None:
-    image = Image.new("RGB", (300, 200))
+    image = Image.new(
+        "RGB",
+        (300, 200),
+    )
 
     transformed = build_train_transforms(224)(image)
 
-    assert isinstance(transformed, torch.Tensor)
-    assert transformed.shape == (3, 224, 224)
+    assert isinstance(
+        transformed,
+        torch.Tensor,
+    )
+    assert transformed.shape == (
+        3,
+        224,
+        224,
+    )
 
 
 def test_eval_transform_returns_tensor() -> None:
-    image = Image.new("RGB", (300, 200))
+    image = Image.new(
+        "RGB",
+        (300, 200),
+    )
 
     transformed = build_eval_transforms(224)(image)
 
-    assert isinstance(transformed, torch.Tensor)
-    assert transformed.shape == (3, 224, 224)
+    assert isinstance(
+        transformed,
+        torch.Tensor,
+    )
+    assert transformed.shape == (
+        3,
+        224,
+        224,
+    )
 
 
 def test_dataloader_batch_shapes(
@@ -126,14 +132,17 @@ def test_dataloader_batch_shapes(
 
     images, labels = next(iter(loader))
 
-    assert images.shape == (2, 3, 224, 224)
+    assert images.shape == (
+        2,
+        3,
+        224,
+        224,
+    )
     assert labels.shape == (2,)
     assert labels.dtype == torch.int64
 
 
-def test_train_validation_split(
-    denomination_directory: Path,
-) -> None:
+def test_train_validation_split(denomination_directory: Path) -> None:
     dataset = DenominationDataset(
         root=denomination_directory,
         transform=build_eval_transforms(),
@@ -148,19 +157,27 @@ def test_train_validation_split(
         seed=42,
     )
 
-    assert len(train_loader.dataset) == 4
-    assert len(val_loader.dataset) == 2
+    train_dataset = cast(Sized, train_loader.dataset)
+    val_dataset = cast(Sized, val_loader.dataset)
+
+    assert len(train_dataset) == 4
+    assert len(val_dataset) == 2
 
 
 def test_authenticity_dataset_returns_tensor_and_int(
     tmp_path: Path,
 ) -> None:
-    image_path = tmp_path / "note.png"
-    create_test_image(image_path)
+    authentic = tmp_path / "authentic"
+    counterfeit = tmp_path / "counterfeit"
+
+    authentic.mkdir()
+    counterfeit.mkdir()
+
+    create_test_image(authentic / "note.png")
+    create_test_image(counterfeit / "fake.png")
 
     dataset = AuthenticityDataset(
         root=tmp_path,
-        samples=[("note.png", 1)],
         transform=build_eval_transforms(),
     )
 
@@ -168,18 +185,20 @@ def test_authenticity_dataset_returns_tensor_and_int(
 
     assert isinstance(image, torch.Tensor)
     assert isinstance(label, int)
-    assert label == 1
 
 
-def test_quality_dataset_returns_tensor_and_int(
-    tmp_path: Path,
-) -> None:
-    image_path = tmp_path / "note.png"
-    create_test_image(image_path)
+def test_quality_dataset_returns_tensor_and_int(tmp_path: Path) -> None:
+    good = tmp_path / "good"
+    bad = tmp_path / "bad"
+
+    good.mkdir()
+    bad.mkdir()
+
+    create_test_image(good / "1.png")
+    create_test_image(bad / "2.png")
 
     dataset = QualityDataset(
         root=tmp_path,
-        samples=[("note.png", 2)],
         transform=build_eval_transforms(),
     )
 
@@ -187,4 +206,3 @@ def test_quality_dataset_returns_tensor_and_int(
 
     assert isinstance(image, torch.Tensor)
     assert isinstance(label, int)
-    assert label == 2

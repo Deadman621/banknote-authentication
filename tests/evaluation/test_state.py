@@ -95,4 +95,4 @@ def test_evaluation_result_is_frozen() -> None:
     )
 
     with pytest.raises(FrozenInstanceError):
-        result.loss = 0.5
+        result.loss = 0.5 # pyright: ignore[reportAttributeAccessIssue]

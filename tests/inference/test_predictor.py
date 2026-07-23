@@ -14,15 +14,17 @@ from src.inference.state import (
 
 
 class ToyModel(nn.Module):
-    def forward(
-        self,
-        images: Tensor,
-    ) -> Tensor:
+    def __init__(self) -> None:
+        super().__init__()
+        self.dummy = nn.Parameter(torch.zeros(1))
+
+    def forward(self, images: Tensor) -> Tensor:
         batch_size = images.shape[0]
 
         logits = torch.tensor(
             [[1.0, 2.0, 5.0]],
             dtype=torch.float32,
+            device=self.dummy.device,
         )
 
         return logits.repeat(batch_size, 1)
