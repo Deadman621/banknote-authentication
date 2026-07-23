@@ -9,6 +9,7 @@ import torch.nn as nn
 
 from .resnet50 import ResNet50
 from .efficientnet_b0 import EfficientNetB0
+from .mobilenet_v3 import MobileNetClassifier
 from .swin_transformer import SwinTransformer
 from .cnn import CNN
 
@@ -21,12 +22,12 @@ class ModelRegistry:
         "cnn": CNN,
         "resnet50": ResNet50,
         "efficientnet_b0": EfficientNetB0,
+        "mobilenet": MobileNetClassifier,
         "swin_transformer": SwinTransformer,
     }
 
     _TIMM_MODELS: Dict[str, str] = {
         "efficientnet_b3": "efficientnet_b3",
-        "mobilenet_v3": "mobilenetv3_large_100",
         "vit": "vit_base_patch16_224",
     }
 
