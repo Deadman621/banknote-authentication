@@ -1,25 +1,58 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
+import sys
 from pathlib import Path
-
-from scripts._common import run_streamlit_app
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Launch the Streamlit dashboard.")
+    parser = argparse.ArgumentParser(
+        description="Launch the Streamlit dashboard."
+    )
+
     parser.add_argument(
         "--app",
-        default=str(Path(__file__).resolve().parents[1] / "src" / "dashboard" / "app.py"),
-        help="Dashboard app path.",
+        type=Path,
+        default=(
+            Path(__file__).resolve().parents[1]
+            / "src"
+            / "dashboard"
+            / "app.py"
+        ),
+        help="Path to the Streamlit application.",
     )
-    parser.add_argument("streamlit_args", nargs=argparse.REMAINDER)
+
+    parser.add_argument(
+        "streamlit_args",
+        nargs=argparse.REMAINDER,
+    )
+
     return parser.parse_args()
+
+
+def run_streamlit(app: Path, extra_args: list[str]) -> int:
+    command = [
+        sys.executable,
+        "-m",
+        "streamlit",
+        "run",
+        str(app),
+        *extra_args,
+    ]
+
+    return subprocess.call(command)
 
 
 def main() -> None:
     args = parse_args()
-    raise SystemExit(run_streamlit_app(Path(args.app), args.streamlit_args))
+
+    raise SystemExit(
+        run_streamlit(
+            app=args.app,
+            extra_args=args.streamlit_args,
+        )
+    )
 
 
 if __name__ == "__main__":
