@@ -22,7 +22,7 @@ class ModelRegistry:
         "cnn": CNN,
         "resnet50": ResNet50,
         "efficientnet_b0": EfficientNetB0,
-        "mobilenet": MobileNetClassifier,
+        "mobilenet_v3": MobileNetClassifier,
         "swin_transformer": SwinTransformer,
     }
 
