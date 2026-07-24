@@ -2,6 +2,9 @@
 
 FROM pytorch/pytorch:2.13.0-cuda13.2-cudnn9-runtime
 
+# Copy the compiled Typst binary directly from the official container registry
+COPY --from=ghcr.io/typst/typst:latest /bin/typst /usr/local/bin/typst
+
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
